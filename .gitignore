@@ -11,25 +11,17 @@ __pycache__/
 .venv/
 venv/
 
-# Jupyter
-.ipynb_checkpoints/
+# Data & outputs
+01_data/*
+03_analysis/*
+04_results/*
+99_logs/*
 
-# Logs
-99_logs/
-*.log
-
-# Data (large/raw)
-01_data/00_sra/
-01_data/01_raw_fastq/
-01_data/02_trimmed_fastq/
-
-# Analysis artifacts
-03_analysis/
-
-# Results (if large; keep placeholder structure)
-04_results/figures/
-04_results/reports/
-04_results/tables/
+# Keep directory structure
+!01_data/.gitkeep
+!03_analysis/.gitkeep
+!04_results/.gitkeep
+!99_logs/.gitkeep
 
 # QC outputs
 **/fastqc/
@@ -38,3 +30,13 @@ venv/
 # Temporary files
 *.tmp
 *.temp
+
+# Sequencing files
+*.fastq
+*.fq
+*.fastq.gz
+*.fq.gz
+
+# Logs
+*.log
+slurm-*.out
