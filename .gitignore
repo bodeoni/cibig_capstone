@@ -1,0 +1,40 @@
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.venv/
+venv/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+99_logs/
+*.log
+
+# Data (large/raw)
+01_data/00_sra/
+01_data/01_raw_fastq/
+01_data/02_trimmed_fastq/
+
+# Analysis artifacts
+03_analysis/
+
+# Results (if large; keep placeholder structure)
+04_results/figures/
+04_results/reports/
+04_results/tables/
+
+# QC outputs
+**/fastqc/
+**/multiqc/
+
+# Temporary files
+*.tmp
+*.temp
