@@ -7,6 +7,9 @@
 ## Goal
 Identify differentially expressed genes between viruliferous and non-viruliferous flies using bulk RNA-seq.
 
+## Data
+The data is from "Gene expression differences in Bemisia tabaci following acquisition of an Old World begomovirus" available at https://doi.org/10.1038/s41597-025-06417-3 . SRA accession number for the dataset is [PRJNA1096732](https://www.ncbi.nlm.nih.gov/bioproject/PRJNA1096732). 
+
 ## Samples
 Raw sample identifiers are stored under `01_data/00_sra/` and corresponding FASTQs are under `01_data/01_raw_fastq/`.
 Each sample folder is named with the SRA run ID (e.g., `SRR28578498`).
