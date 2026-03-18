@@ -36,8 +36,8 @@ hisat2 --version | head -n 1
 CLEAN_DIR="$BASE_DIR/01_data/02_trimmed_fastq"
 REF="$BASE_DIR/01_data/03_references/MEAM1_contiminants.fa"
 
-# Recommended: processing output folder (not analysis), but keep yours if you want
-OUT_BASE="$BASE_DIR/03_analysis/03_hisat2_decontam"
+# processing output folder
+OUT_BASE="$BASE_DIR/03_analysis/02_hisat2_decontam"
 INDEX_DIR="$OUT_BASE/index"
 BAM_DIR="$OUT_BASE/bam"
 UNMAP_DIR="$OUT_BASE/unmapped_fastq"

@@ -7,7 +7,7 @@
 
 # Paths
 ## Input data directory
-DATA_DIR="/data/onilee/capstone"
+DATA_DIR="/scratch/onilee/capstone"
 
 ## Output directories
 fastqc_dir="$DATA_DIR/03_analysis/01_qc/a_fastqc"
@@ -20,7 +20,7 @@ echo "-----------------FASTQC-----------------------"
 echo "----------------------------------------------"
 
 # Load FastQC module
-module load FastQC/0.12.1
+module load bioinfo-shared FastQC/0.12.1
 
 # Record FastQC version
 fastqc -v >> "$DATA_DIR/00_meta/software_versions.txt"

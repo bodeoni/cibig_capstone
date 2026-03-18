@@ -7,7 +7,7 @@
 #SBATCH --nodelist=node06
 
 # Paths
-DATA_DIR="/data/onilee/capstone"
+DATA_DIR="/scratch/onilee/capstone"
 TMP_DIR="/lscratch/onilee/tmp_space"
 INPUT="$DATA_DIR/01_data/00_sra"
 OUTPUT="$DATA_DIR/01_data/01_raw_fastq"

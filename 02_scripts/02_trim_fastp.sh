@@ -7,14 +7,14 @@
 
 set -euo pipefail
 
-DATA_DIR="/data/onilee/capstone" # main project directory
+DATA_DIR="/scratch/onilee/capstone" # main project directory
 
 RAW_DIR="$DATA_DIR/01_data/01_raw_fastq" # Directory containing raw FASTQ files (SRR*/ subdirectories)
-OUT_REPORTS="$DATA_DIR/03_analysis/02_fastp" # Directory to save fastp reports and MultiQC results
+OUT_REPORTS="$DATA_DIR/03_analysis/01_qc" # Directory to save fastp reports and MultiQC results
 CLEAN_FASTQ_DIR="$DATA_DIR/01_data/02_trimmed_fastq" # Directory to save trimmed FASTQ files
 
-REPORT_DIR="$OUT_REPORTS/4-fastp_reports"
-MULTIQC_DIR="$OUT_REPORTS/5-multiqc_post"
+REPORT_DIR="$OUT_REPORTS/c_fastp_reports"
+MULTIQC_DIR="$OUT_REPORTS/d_multiqc_post_fastp"
 
 mkdir -p "$CLEAN_FASTQ_DIR" "$REPORT_DIR" "$MULTIQC_DIR"
 
