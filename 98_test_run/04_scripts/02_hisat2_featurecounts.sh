@@ -2,7 +2,7 @@
 #SBATCH --job-name=hisat2_fc
 #SBATCH --output=/projects/Whitefly_RNASeq/98_test_run/99_logs/approach2_hisat2_%j.log
 #SBATCH --error=/projects/Whitefly_RNASeq/98_test_run/99_logs/approach2_hisat2_%j.err
-#SBATCH --cpus-per-task=16
+#SBATCH --cpus-per-task=32
 #SBATCH --mem=32G
 
 # ================================================================================
@@ -43,7 +43,7 @@ SUBREAD_CONTAINER="/projects/onilee/software/containers/subread_2.1.1.sif"
 SAMTOOLS_CONTAINER="/projects/onilee/software/containers/samtools_1.23.sif"
 
 # Resources
-THREADS=16
+THREADS=32
 
 # Sample IDs
 SAMPLES=("SRR28578498" "SRR28578499" "SRR28578500")
@@ -160,7 +160,7 @@ echo "[$(date)] Counting features..."
 apptainer exec "${SUBREAD_CONTAINER}" featureCounts \
     -T "${THREADS}" \
     -p \
-    -t exon \
+    -t mRNA \
     -g Parent \
     -a "${REF_DIR}/MEAM1_v1.2.gff3" \
     -o "${OUTPUT_DIR}/counts/all_samples_counts.txt" \

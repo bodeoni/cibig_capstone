@@ -16,6 +16,8 @@ venv/
 03_analysis/*
 04_results/*
 99_logs/*
+98_test_run/*
+!98_test_run/04_scripts/
 
 # Keep directory structure
 !01_data/.gitkeep
@@ -40,3 +42,13 @@ venv/
 # Logs
 *.log
 slurm-*.out
+*.err
+
+# Text Files
+*.txt
+*.csv
+*.tab
+
+# Intermediate files
+*.bam
+*.sam
