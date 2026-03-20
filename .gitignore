@@ -18,12 +18,14 @@ venv/
 99_logs/*
 98_test_run/*
 !98_test_run/04_scripts/
+!98_test_run/03_results/
 
 # Keep directory structure
 !01_data/.gitkeep
 !03_analysis/.gitkeep
 !04_results/.gitkeep
 !99_logs/.gitkeep
+!*/.gitkeep
 
 # QC outputs
 **/fastqc/

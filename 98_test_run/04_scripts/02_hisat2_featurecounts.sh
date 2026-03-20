@@ -14,10 +14,6 @@
 
 set -euo pipefail
 
-# --- INITIALIZE WAVE MODULE ENVIRONMENT ---
-source /usr/local/bioinfo/modules-5.4.0/init/bash
-module use /usr/local/bioinfo/modulefiles/environment/
-
 # Module loads
 module load bioinfo-shared apptainer
 

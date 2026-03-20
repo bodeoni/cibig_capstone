@@ -34,8 +34,8 @@ GTF_FILE="${REF_DIR}/MEAM1_v1.2.gff3.gz"
 STAR_INDEX="${REF_DIR}/star_index"  # Directory for STAR index
 
 # Containers
-STAR_CONTAINER="/projects/onilee/software/containers/star_2.7.11.sif"  # UPDATE VERSION
-SUBREAD_CONTAINER="/projects/onilee/software/containers/subread_2.1.1.sif"  # UPDATE VERSION
+STAR_CONTAINER="/projects/onilee/software/containers/star_2.7.11.sif" 
+SUBREAD_CONTAINER="/projects/onilee/software/containers/subread_2.1.1.sif"  
 
 # Resources
 THREADS=16
