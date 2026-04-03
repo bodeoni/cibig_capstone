@@ -110,11 +110,11 @@ fi
 # named: <sample>_unmapped.fastq.gz.1  and  <sample>_unmapped.fastq.gz.2
 
 shopt -s nullglob
-r1_files=("${DECONTAM_DIR}"/*_unmapped.fastq.gz.1)
+r1_files=("${DECONTAM_DIR}"/*_unmapped.fastq.1.gz)
 
 if [ ${#r1_files[@]} -eq 0 ]; then
   echo "ERROR: No decontaminated FASTQ files found in ${DECONTAM_DIR}"
-  echo "  Expected pattern: *_unmapped.fastq.gz.1"
+  echo "  Expected pattern: *_unmapped.fastq.1.gz"
   exit 1
 fi
 
@@ -127,8 +127,8 @@ echo "[$(date)] Found ${#r1_files[@]} sample(s)"
 BAM_FILES=()
 
 for r1 in "${r1_files[@]}"; do
-  SAMPLE=$(basename "${r1}" _unmapped.fastq.gz.1)
-  r2="${DECONTAM_DIR}/${SAMPLE}_unmapped.fastq.gz.2"
+  SAMPLE=$(basename "${r1}" _unmapped.fastq.1.gz)
+  r2="${DECONTAM_DIR}/${SAMPLE}_unmapped.fastq.2.gz"
 
   if [ ! -f "${r2}" ]; then
     echo "WARNING: R2 not found for ${SAMPLE}, skipping"
