@@ -47,5 +47,32 @@ Script: [02_scripts/02_trim_fastp.sh](02_scripts/02_trim_fastp.sh)
 	- Reports: `--html <sample>.fastp.html --json <sample>.fastp.json`
 - SLURM resources: 24 CPUs, partition `normal`, node `node06`
 
+## Step 4 (cont.): STAR alignment and featureCounts quantification
+Script: [02_scripts/04_star_align_counts.sh](02_scripts/04_star_align_counts.sh)
+
+- Tools: STAR v2.7.11 (apptainer), featureCounts / Subread v2.1.1 (apptainer)
+- Input: HISAT2-decontaminated unmapped reads in `03_analysis/03_hisat2_decontam/unmapped_fastq/`
+  - File naming: `<sample>_unmapped.fastq.gz.1` / `<sample>_unmapped.fastq.gz.2` (from `--un-conc-gz`)
+- Reference:
+  - Genome: `01_data/03_references/MEAM1_scaffold_v1.2.fa`
+  - Annotation: `01_data/03_references/MEAM1_v1.2.gff3`
+  - STAR index: `01_data/03_references/star_index/`
+- STAR parameters:
+  - `--outSAMtype BAM SortedByCoordinate`
+  - `--sjdbGTFtagExonParentTranscript Parent`
+  - `--genomeSAindexNbases 12` (reduced for small genome)
+  - `--sjdbOverhang 99`
+- featureCounts parameters:
+  - `-p` (paired-end)
+  - `-t mRNA` (feature type)
+  - `-g Parent` (attribute for gene ID)
+- Output:
+  - BAM files: `03_analysis/04_star_align/bam/`
+  - Combined counts: `03_analysis/04_star_align/counts/all_samples_genelevel.txt`
+  - Per-sample counts: `03_analysis/04_star_align/counts/<sample>_genelevel.txt`
+  - STAR logs: `03_analysis/04_star_align/logs/`
+- Samples: discovered dynamically from decontam output directory (no hardcoding)
+- SLURM resources: 24 CPUs, 64G RAM, partition `normal`, node `node06`
+
 ## Software versions
 All module versions are appended to [00_meta/software_versions.txt](00_meta/software_versions.txt) during each step.

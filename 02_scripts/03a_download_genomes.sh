@@ -9,7 +9,7 @@
 # Script to downlaoad reference genomes as well as potential contaminats (endosymbionts etc)
 
 # Paths
-DATA_DIR="/data/onilee/capstone/01_data"
+DATA_DIR="/scratch/onilee/capstone/01_data"
 
 # move into data directory
 mkdir -p "$DATA_DIR/03_references"

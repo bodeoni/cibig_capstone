@@ -11,7 +11,7 @@ set -euo pipefail
 echo "Job started at: $(date)"
 echo "Running on: $(hostname)"
 
-BASE_DIR="/data/onilee/capstone"
+BASE_DIR="/scratch/onilee/capstone"
 
 # ==============================
 # Activate conda environment
