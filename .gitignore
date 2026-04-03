@@ -26,6 +26,11 @@ venv/
 !04_results/.gitkeep
 !99_logs/.gitkeep
 !*/.gitkeep
+!**/.gitkeep
+!98_test_run/01_data/.gitkeep
+!98_test_run/02_analysis/.gitkeep
+!98_test_run/99_logs/.gitkeep
+!98_test_run/98_refs/.gitkeep
 
 # QC outputs
 **/fastqc/
