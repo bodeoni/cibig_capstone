@@ -12,7 +12,9 @@ set -euo pipefail
 echo "Job started at: $(date)"
 echo "Running on:     $(hostname)"
 
-module load bioinfo-shared apptainer
+module load miniconda3
+eval "$(conda shell.bash hook)"
+conda activate rnaseq
 
 # ================================================================================
 # CONFIGURATION
@@ -28,10 +30,6 @@ R_SCRIPT="${BASE_DIR}/02_scripts/05_deseq2.R"
 # ── Outputs ───────────────────────────────────────────────────────────────────
 OUT_DIR="${BASE_DIR}/03_analysis/05_deseq2"
 
-# ── Container ─────────────────────────────────────────────────────────────────
-# Update this path to match the actual location of your DESeq2 container
-DESEQ2_CONTAINER="/projects/onilee/software/containers/deseq2_1.50.sif"
-
 # ================================================================================
 # PREFLIGHT CHECKS
 # ================================================================================
@@ -41,7 +39,7 @@ echo "=========================================="
 echo "Preflight checks"
 echo "=========================================="
 
-for f in "${COUNT_FILE}" "${META_FILE}" "${R_SCRIPT}" "${DESEQ2_CONTAINER}"; do
+for f in "${COUNT_FILE}" "${META_FILE}" "${R_SCRIPT}"; do
   if [ ! -f "${f}" ]; then
     echo "ERROR: Required file not found: ${f}"
     exit 1
@@ -55,7 +53,7 @@ done
 
 mkdir -p "${OUT_DIR}/plots" "${OUT_DIR}/tables"
 
-# Copy R script to scratch for reproducibility
+# Copy R script alongside outputs for reproducibility
 cp "${R_SCRIPT}" "${OUT_DIR}/05_deseq2.R"
 
 echo ""
@@ -65,20 +63,18 @@ echo "=========================================="
 echo "  Count matrix:  ${COUNT_FILE}"
 echo "  Metadata:      ${META_FILE}"
 echo "  Output dir:    ${OUT_DIR}"
-echo "  Container:     ${DESEQ2_CONTAINER}"
+echo "  R environment: $(conda info --envs | grep '*' | awk '{print $1}')"
+echo "  Rscript:       $(which Rscript)"
 echo ""
 
 # ================================================================================
-# RUN R SCRIPT INSIDE CONTAINER
+# RUN DESEQ2
 # ================================================================================
 
-apptainer exec \
-  --bind "${BASE_DIR}:${BASE_DIR}" \
-  "${DESEQ2_CONTAINER}" \
-  Rscript "${R_SCRIPT}" \
-    "${COUNT_FILE}" \
-    "${META_FILE}" \
-    "${OUT_DIR}"
+Rscript "${R_SCRIPT}" \
+  "${COUNT_FILE}" \
+  "${META_FILE}" \
+  "${OUT_DIR}"
 
 # ================================================================================
 # COPY KEY RESULTS TO 04_results/
@@ -92,12 +88,10 @@ echo "=========================================="
 RESULTS_DIR="${BASE_DIR}/04_results"
 mkdir -p "${RESULTS_DIR}/figures" "${RESULTS_DIR}/tables"
 
-# Copy all plots
 cp "${OUT_DIR}"/plots/*.png "${RESULTS_DIR}/figures/" 2>/dev/null && \
   echo "  Copied plots to ${RESULTS_DIR}/figures/" || \
   echo "  WARNING: No PNG plots found to copy"
 
-# Copy significant DEG tables
 cp "${OUT_DIR}"/tables/*_sig.csv "${RESULTS_DIR}/tables/" 2>/dev/null && \
   echo "  Copied sig DEG tables to ${RESULTS_DIR}/tables/" || \
   echo "  WARNING: No sig tables found to copy"
