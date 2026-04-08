@@ -7,7 +7,7 @@
 #SBATCH --partition=normal
 #SBATCH --nodelist=node06
 
-set -euo pipefail
+#set -euo pipefail
 
 echo "Job started at: $(date)"
 echo "Running on: $(hostname)"

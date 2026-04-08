@@ -1,3 +1,11 @@
 === Thu Feb 12 02:55:16 PM GMT 2026 ===
 hisat2: /home/onilee/.conda/envs/bioinfo/bin/hisat2-align-s version 2.2.2
 samtools: samtools 1.23
+=== Fri Apr  3 08:06:46 AM GMT 2026 ===
+STAR: INFO:    gocryptfs not found, will not be able to use gocryptfs
+2.7.11b
+featureCounts: INFO:    gocryptfs not found, will not be able to use gocryptfs
+=== Fri Apr  3 08:07:28 AM GMT 2026 ===
+STAR: INFO:    gocryptfs not found, will not be able to use gocryptfs
+2.7.11b
+featureCounts: INFO:    gocryptfs not found, will not be able to use gocryptfs
