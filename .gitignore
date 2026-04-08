@@ -49,7 +49,7 @@ slurm-*.out
 
 # Text Files
 *.txt
-*.csv
+#*.csv
 *.tab
 
 # Intermediate files
