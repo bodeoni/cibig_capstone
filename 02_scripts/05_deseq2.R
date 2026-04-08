@@ -350,21 +350,9 @@ if (nrow(sig) >= 2) {
 
 cat("[6/7] Time-point-specific results...\n")
 
-dds_tp <- DESeqDataSetFromMatrix(
-  countData = counts,
-  colData   = meta,
-  design    = ~ Time_Point + Group + Time_Point:Group
-)
-dds_tp <- dds_tp[rowSums(counts(dds_tp)) >= 10, ]
-dds_tp <- DESeq(dds_tp)
-
 for (tp in c("24h", "48h", "72h")) {
-  tp_label <- gsub("h", "h", tp)
-
-  # The interaction term tests whether the virus effect differs at this time point
-  # For direct virus vs control within a time point, subset and rerun
-  sub_idx <- meta$Time_Point == tp
-  sub_counts <- counts[rowSums(counts) >= 10, sub_idx]
+  sub_idx    <- meta$Time_Point == tp
+  sub_counts <- counts[rowSums(counts[, sub_idx]) >= 10, sub_idx]
   sub_meta   <- meta[sub_idx, ]
   sub_meta$Group <- droplevels(sub_meta$Group)
 
