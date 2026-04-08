@@ -12,7 +12,7 @@ set -euo pipefail
 echo "Job started at: $(date)"
 echo "Running on:     $(hostname)"
 
-module load miniconda3
+module load bioinfo-wave miniconda3
 eval "$(conda shell.bash hook)"
 conda activate rnaseq
 
