@@ -1,8 +1,11 @@
 # CiBIG Capstone: Viruliferous vs Non-viruliferous Whiteflies RNA-seq
 
 **Author:** Olabode Onile-ere
+
 **Program:** Certificate in Bioinformatics and Genomics (CiBIG)
+
 **Cluster:** WAVE HPC (SLURM scheduler)
+
 **Working directory (cluster):** `/scratch/onilee/capstone` inside node06
 
 ---
