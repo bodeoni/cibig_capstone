@@ -12,6 +12,51 @@ suppressPackageStartupMessages({
   library(RColorBrewer)
 })
 
+# =============================================================================
+# HELPER: volcano plot for a given LFC threshold
+# lfc_thresh = 0  →  colour by padj < 0.05 only (no LFC filter on colouring)
+# =============================================================================
+make_volcano <- function(res_df, lfc_thresh, title, out_path_base) {
+  vol <- res_df[!is.na(res_df$padj) & !is.na(res_df$log2FoldChange), ]
+  vol$sig <- "Not significant"
+  if (lfc_thresh > 0) {
+    vol$sig[vol$padj < 0.05 & vol$log2FoldChange >  lfc_thresh] <- "Up"
+    vol$sig[vol$padj < 0.05 & vol$log2FoldChange < -lfc_thresh] <- "Down"
+  } else {
+    vol$sig[vol$padj < 0.05 & vol$log2FoldChange > 0] <- "Up"
+    vol$sig[vol$padj < 0.05 & vol$log2FoldChange < 0] <- "Down"
+  }
+  vol$sig  <- factor(vol$sig, levels = c("Up", "Down", "Not significant"))
+  top10    <- head(vol[vol$sig != "Not significant", ], 10)
+  n_up     <- sum(vol$sig == "Up")
+  n_dn     <- sum(vol$sig == "Down")
+  cut_lbl  <- if (lfc_thresh > 0) paste0("padj<0.05, |LFC|>", lfc_thresh) else "padj<0.05"
+
+  p <- ggplot(vol, aes(log2FoldChange, -log10(padj), colour = sig)) +
+    geom_point(alpha = 0.5, size = 1.2) +
+    geom_point(data = top10, size = 2, alpha = 0.9) +
+    geom_text(data = top10, aes(label = GeneID),
+      vjust = -0.5, hjust = 0.5, size = 2.8, colour = "black", check_overlap = TRUE) +
+    geom_hline(yintercept = -log10(0.05), linetype = "dashed", colour = "grey40") +
+    scale_colour_manual(values = c("Up" = "#D6604D", "Down" = "#2166AC", "Not significant" = "grey70")) +
+    labs(
+      title    = title,
+      subtitle = paste0(n_up + n_dn, " DEGs (", cut_lbl, ")  |  ", n_up, " up, ", n_dn, " down"),
+      x        = expression(log[2]~"fold change"),
+      y        = expression(-log[10]~"adjusted p-value"),
+      colour   = NULL
+    ) +
+    theme_bw(base_size = 13) +
+    theme(plot.title = element_text(face = "bold"), legend.position = "top")
+
+  if (lfc_thresh > 0)
+    p <- p + geom_vline(xintercept = c(-lfc_thresh, lfc_thresh), linetype = "dashed", colour = "grey40")
+
+  ggsave(paste0(out_path_base, ".pdf"), p, width = 7, height = 6, dpi = 300)
+  ggsave(paste0(out_path_base, ".png"), p, width = 7, height = 6, dpi = 300)
+  invisible(p)
+}
+
 # ── Paths (passed from SLURM script) ─────────────────────────────────────────
 args        <- commandArgs(trailingOnly = TRUE)
 count_file  <- args[1]   # all_samples_genelevel.txt
@@ -122,17 +167,22 @@ write.csv(res_df,
   file      = file.path(out_dir, "tables", "deseq2_virus_vs_control_all.csv"),
   row.names = FALSE)
 
-# Significant DEGs (padj < 0.05 & |LFC| > 1)
-sig <- res_df[!is.na(res_df$padj) & res_df$padj < 0.05 & abs(res_df$log2FoldChange) > 1, ]
+# Three significance cutoffs
+sig        <- res_df[!is.na(res_df$padj) & res_df$padj < 0.05 & abs(res_df$log2FoldChange) > 1,    ]
+sig_lfc058 <- res_df[!is.na(res_df$padj) & res_df$padj < 0.05 & abs(res_df$log2FoldChange) > 0.58, ]
+sig_pval   <- res_df[!is.na(res_df$padj) & res_df$padj < 0.05, ]
 
-write.csv(sig,
-  file      = file.path(out_dir, "tables", "deseq2_virus_vs_control_sig.csv"),
-  row.names = FALSE)
+write.csv(sig,        file.path(out_dir, "tables", "deseq2_virus_vs_control_sig_lfc1.csv"),   row.names = FALSE)
+write.csv(sig_lfc058, file.path(out_dir, "tables", "deseq2_virus_vs_control_sig_lfc058.csv"), row.names = FALSE)
+write.csv(sig_pval,   file.path(out_dir, "tables", "deseq2_virus_vs_control_sig_pval.csv"),   row.names = FALSE)
 
 cat("  Total tested genes:", nrow(res_df), "\n")
-cat("  Significant DEGs (padj<0.05, |LFC|>1):", nrow(sig), "\n")
-cat("  Upregulated in virus:", sum(sig$log2FoldChange > 0), "\n")
-cat("  Downregulated in virus:", sum(sig$log2FoldChange < 0), "\n")
+cat(sprintf("  |LFC|>1    (2-fold):   %d DEGs [%d up, %d down in virus]\n",
+  nrow(sig),       sum(sig$log2FoldChange > 0),       sum(sig$log2FoldChange < 0)))
+cat(sprintf("  |LFC|>0.58 (1.5-fold): %d DEGs [%d up, %d down in virus]\n",
+  nrow(sig_lfc058), sum(sig_lfc058$log2FoldChange > 0), sum(sig_lfc058$log2FoldChange < 0)))
+cat(sprintf("  padj<0.05 only:        %d DEGs [%d up, %d down in virus]\n",
+  nrow(sig_pval),   sum(sig_pval$log2FoldChange > 0),   sum(sig_pval$log2FoldChange < 0)))
 
 # =============================================================================
 # 5. PLOT 1: PCA
@@ -211,10 +261,11 @@ pheatmap(
 )
 dev.off()
 
-# ── Plot 3: Volcano Plot ──────────────────────────────────────────────────────
+# ── Plot 3: Volcano Plots (one per LFC cutoff) ───────────────────────────────
 
-cat("  - Volcano plot\n")
+cat("  - Volcano plots (3 cutoffs)\n")
 
+# volcano_df retained here with |LFC|>1 colouring for use by MA plot below
 volcano_df <- res_df[!is.na(res_df$padj) & !is.na(res_df$log2FoldChange), ]
 volcano_df$significance <- "Not significant"
 volcano_df$significance[volcano_df$padj < 0.05 & volcano_df$log2FoldChange >  1] <- "Up in virus"
@@ -222,42 +273,14 @@ volcano_df$significance[volcano_df$padj < 0.05 & volcano_df$log2FoldChange < -1]
 volcano_df$significance <- factor(volcano_df$significance,
   levels = c("Up in virus", "Down in virus", "Not significant"))
 
-# Top 10 genes to label
-top_label <- head(volcano_df[volcano_df$significance != "Not significant", ], 10)
-
-volcano_plot <- ggplot(volcano_df, aes(log2FoldChange, -log10(padj), colour = significance)) +
-  geom_point(alpha = 0.5, size = 1.2) +
-  geom_point(data = top_label, size = 2, alpha = 0.9) +
-  geom_text(data = top_label, aes(label = GeneID),
-    vjust = -0.5, hjust = 0.5, size = 2.8, colour = "black", check_overlap = TRUE) +
-  geom_vline(xintercept = c(-1, 1), linetype = "dashed", colour = "grey40") +
-  geom_hline(yintercept = -log10(0.05), linetype = "dashed", colour = "grey40") +
-  scale_colour_manual(values = c(
-    "Up in virus"      = "#D6604D",
-    "Down in virus"    = "#2166AC",
-    "Not significant"  = "grey70"
-  )) +
-  labs(
-    title    = "Volcano plot: virus vs control",
-    subtitle = paste0(
-      nrow(sig), " DEGs (padj<0.05, |LFC|>1)  |  ",
-      sum(sig$log2FoldChange > 0), " up, ",
-      sum(sig$log2FoldChange < 0), " down in virus"
-    ),
-    x      = expression(log[2]~"fold change (virus / control)"),
-    y      = expression(-log[10]~"adjusted p-value"),
-    colour = NULL
-  ) +
-  theme_bw(base_size = 13) +
-  theme(
-    plot.title    = element_text(face = "bold"),
-    legend.position = "top"
+for (cut in list(list(thresh = 1, tag = "lfc1"), list(thresh = 0.58, tag = "lfc058"), list(thresh = 0, tag = "pval"))) {
+  make_volcano(
+    res_df        = res_df,
+    lfc_thresh    = cut$thresh,
+    title         = "Volcano: virus vs control",
+    out_path_base = file.path(out_dir, "plots", paste0("volcano_virus_vs_control_", cut$tag))
   )
-
-ggsave(file.path(out_dir, "plots", "volcano_plot.pdf"),
-  volcano_plot, width = 7, height = 6, dpi = 300)
-ggsave(file.path(out_dir, "plots", "volcano_plot.png"),
-  volcano_plot, width = 7, height = 6, dpi = 300)
+}
 
 # ── Plot 4: MA Plot ───────────────────────────────────────────────────────────
 
@@ -367,21 +390,28 @@ for (tp in c("24h", "48h", "72h")) {
   res_sub_df$GeneID <- rownames(res_sub_df)
   res_sub_df <- res_sub_df[order(res_sub_df$padj, na.last = TRUE), ]
 
-  sig_sub <- res_sub_df[!is.na(res_sub_df$padj) & res_sub_df$padj < 0.05 &
-                        abs(res_sub_df$log2FoldChange) > 1, ]
+  sig_sub        <- res_sub_df[!is.na(res_sub_df$padj) & res_sub_df$padj < 0.05 & abs(res_sub_df$log2FoldChange) > 1,    ]
+  sig_sub_lfc058 <- res_sub_df[!is.na(res_sub_df$padj) & res_sub_df$padj < 0.05 & abs(res_sub_df$log2FoldChange) > 0.58, ]
+  sig_sub_pval   <- res_sub_df[!is.na(res_sub_df$padj) & res_sub_df$padj < 0.05, ]
 
-  write.csv(res_sub_df,
-    file      = file.path(out_dir, "tables", paste0("deseq2_", tp, "_all.csv")),
-    row.names = FALSE)
-  write.csv(sig_sub,
-    file      = file.path(out_dir, "tables", paste0("deseq2_", tp, "_sig.csv")),
-    row.names = FALSE)
+  write.csv(res_sub_df,    file.path(out_dir, "tables", paste0("deseq2_", tp, "_all.csv")),        row.names = FALSE)
+  write.csv(sig_sub,       file.path(out_dir, "tables", paste0("deseq2_", tp, "_sig_lfc1.csv")),   row.names = FALSE)
+  write.csv(sig_sub_lfc058,file.path(out_dir, "tables", paste0("deseq2_", tp, "_sig_lfc058.csv")), row.names = FALSE)
+  write.csv(sig_sub_pval,  file.path(out_dir, "tables", paste0("deseq2_", tp, "_sig_pval.csv")),   row.names = FALSE)
 
-  cat(sprintf("  %s: %d DEGs (padj<0.05, |LFC|>1)  [%d up, %d down in virus]\n",
-    tp, nrow(sig_sub),
-    sum(sig_sub$log2FoldChange > 0),
-    sum(sig_sub$log2FoldChange < 0)
+  cat(sprintf("  %s | |LFC|>1: %d  |LFC|>0.58: %d  padj only: %d  [up/dn at lfc1: %d/%d]\n",
+    tp, nrow(sig_sub), nrow(sig_sub_lfc058), nrow(sig_sub_pval),
+    sum(sig_sub$log2FoldChange > 0), sum(sig_sub$log2FoldChange < 0)
   ))
+
+  for (cut in list(list(thresh = 1, tag = "lfc1"), list(thresh = 0.58, tag = "lfc058"), list(thresh = 0, tag = "pval"))) {
+    make_volcano(
+      res_df        = res_sub_df,
+      lfc_thresh    = cut$thresh,
+      title         = paste0("Volcano: virus vs control (", tp, ")"),
+      out_path_base = file.path(out_dir, "plots", paste0("volcano_", tp, "_", cut$tag))
+    )
+  }
 }
 
 # =============================================================================
