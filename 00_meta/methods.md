@@ -1,78 +1,228 @@
 # Methods
 
 ## Overview
-This project processes bulk RNA-seq data from viruliferous and non-viruliferous flies. The workflow includes SRA extraction, read-level QC, and adapter/quality trimming. All steps are run on the Negishi cluster using SLURM.
+
+Bulk RNA-seq data from viruliferous and non-viruliferous *Bemisia tabaci* (MEAM1 biotype) were processed to identify differentially expressed genes following begomovirus acquisition. The pipeline covers raw data extraction, quality control, trimming, endosymbiont decontamination, alignment, quantification, and differential expression analysis. All steps are run on the Negishi HPC cluster using SLURM. Containerised tools are executed via Apptainer; R-based steps use a dedicated conda environment.
+
+---
 
 ## Step 1: SRA to FASTQ extraction
-Script: [02_scripts/00-extract_fastq.sh](02_scripts/00-extract_fastq.sh)
 
-- Tool: `fasterq-dump`
+Script: [02_scripts/00-extract_fastq.sh](../02_scripts/00-extract_fastq.sh)
+
+- Tool: `fasterq-dump` (NCBI SRA Toolkit)
 - Input: SRA directories under `01_data/00_sra/SRR*/`
 - Output: Paired FASTQ files under `01_data/01_raw_fastq/SRR*/`
 - Parameters:
-	- `--split-3` to split paired-end reads
-	- `--threads 16` for parallel extraction
-	- `--outdir` set per sample directory
-	- `--progress` enabled
-	- `--temp` set to `/lscratch/onilee/tmp_space`
+  - `--split-3` — split paired-end reads into R1 and R2
+  - `--threads 16`
+  - `--outdir` set per sample
+  - `--progress` enabled
+  - `--temp /lscratch/onilee/tmp_space`
 - SLURM resources: 16 CPUs, 64G RAM, partition `normal`, node `node06`
 
-## Step 2: Raw read QC
-Script: [02_scripts/01_qc_fastq.sh](02_scripts/01_qc_fastq.sh)
+---
 
-- Tools: `FastQC` v0.12.1, `MultiQC` v1.9
+## Step 2: Raw read QC
+
+Script: [02_scripts/01_qc_fastq.sh](../02_scripts/01_qc_fastq.sh)
+
+- Tools: FastQC v0.12.1, MultiQC v1.9
 - Input: Raw FASTQ files in `01_data/01_raw_fastq/SRR*/`
 - Output:
-	- Per-sample FastQC reports in `03_analysis/01_qc/a_fastqc/SRR*/`
-	- Combined MultiQC report in `03_analysis/01_qc/b_multiqc/multiqc_raw_fastqc.html`
+  - Per-sample FastQC reports: `03_analysis/01_qc/a_fastqc/SRR*/`
+  - Combined MultiQC report: `03_analysis/01_qc/b_multiqc/multiqc_raw_fastqc.html`
 - Parameters:
-	- `fastqc -t $SLURM_CPUS_PER_TASK -o <outdir> <R1> <R2>`
-	- `multiqc -o <multiqc_dir> -n multiqc_raw_fastqc.html <fastqc_dir>`
+  - `fastqc -t $SLURM_CPUS_PER_TASK -o <outdir> <R1> <R2>`
+  - `multiqc -o <multiqc_dir> -n multiqc_raw_fastqc.html <fastqc_dir>`
 - SLURM resources: 16 CPUs, partition `normal`, node `node06`
 
-## Step 3: Trimming and post-trim QC
-Script: [02_scripts/02_trim_fastp.sh](02_scripts/02_trim_fastp.sh)
+---
 
-- Tools: `fastp` v0.20.1, `MultiQC` v1.9
+## Step 3: Adapter trimming and post-trim QC
+
+Script: [02_scripts/02_trim_fastp.sh](../02_scripts/02_trim_fastp.sh)
+
+- Tools: fastp v0.20.1, MultiQC v1.9
 - Input: Raw FASTQ files in `01_data/01_raw_fastq/SRR*/`
 - Output:
-	- Trimmed FASTQs in `01_data/02_trimmed_fastq/`
-	- fastp HTML/JSON reports in `03_analysis/02_fastp/4-fastp_reports/`
-	- MultiQC summary in `03_analysis/02_fastp/5-multiqc_post/`
+  - Trimmed FASTQs: `01_data/02_trimmed_fastq/SRR*_1.clean.fastq.gz`, `SRR*_2.clean.fastq.gz`
+  - fastp HTML/JSON reports: `03_analysis/02_fastp/4-fastp_reports/`
+  - Post-trim MultiQC summary: `03_analysis/02_fastp/5-multiqc_post/`
 - Parameters:
-	- Adapter detection: `--detect_adapter_for_pe`
-	- Quality trimming: `--cut_front --cut_tail --cut_window_size 4 --cut_mean_quality 20`
-	- Minimum length: `--length_required 75`
-	- Threads: `--thread $SLURM_CPUS_PER_TASK`
-	- Reports: `--html <sample>.fastp.html --json <sample>.fastp.json`
-- SLURM resources: 24 CPUs, partition `normal`, node `node06`
+  - `--detect_adapter_for_pe` — automatic adapter detection for paired-end data
+  - `--cut_front --cut_tail` — sliding window quality trimming from both ends
+  - `--cut_window_size 4 --cut_mean_quality 20` — window size and quality threshold
+  - `--length_required 75` — discard reads shorter than 75 bp post-trimming
+  - `--thread $SLURM_CPUS_PER_TASK`
+- SLURM resources: 24 CPUs, 100G RAM, partition `normal`, node `node06`
 
-## Step 4 (cont.): STAR alignment and featureCounts quantification
-Script: [02_scripts/04_star_align_counts.sh](02_scripts/04_star_align_counts.sh)
+---
 
-- Tools: STAR v2.7.11 (apptainer), featureCounts / Subread v2.1.1 (apptainer)
-- Input: HISAT2-decontaminated unmapped reads in `03_analysis/03_hisat2_decontam/unmapped_fastq/`
-  - File naming: `<sample>_unmapped.fastq.gz.1` / `<sample>_unmapped.fastq.gz.2` (from `--un-conc-gz`)
-- Reference:
-  - Genome: `01_data/03_references/MEAM1_scaffold_v1.2.fa`
-  - Annotation: `01_data/03_references/MEAM1_v1.2.gff3`
-  - STAR index: `01_data/03_references/star_index/`
-- STAR parameters:
-  - `--outSAMtype BAM SortedByCoordinate`
-  - `--sjdbGTFtagExonParentTranscript Parent`
-  - `--genomeSAindexNbases 12` (reduced for small genome)
-  - `--sjdbOverhang 99`
-- featureCounts parameters:
-  - `-p` (paired-end)
-  - `-t mRNA` (feature type)
-  - `-g Parent` (attribute for gene ID)
+## Step 4a: Reference genome download
+
+Script: [02_scripts/03a_download_genomes.sh](../02_scripts/03a_download_genomes.sh)
+
+Downloads all reference sequences to `01_data/03_references/`:
+
+| File | Source | Description |
+|---|---|---|
+| `MEAM1_scaffold_v1.2.fa.gz` | whiteflygenomics.org | MEAM1 whitefly genome |
+| `MEAM1_v1.2.gff3.gz` | whiteflygenomics.org | Gene annotation (GFF3) |
+| `NC_006279.1.fa` | NCBI | Mitochondrial genome |
+| `Portiera_meam1_genome_v2.0.fa` | whiteflygenomics.org | Portiera endosymbiont |
+| `Hamiltonella_meam1_genome_v2_0.fa` | whiteflygenomics.org | Hamiltonella endosymbiont |
+| `Rickettsia_meam1_genome_v2.0.fa` | whiteflygenomics.org | Rickettsia endosymbiont |
+| `MEAM1_contiminants.fa` | merged locally | All contaminant genomes combined |
+
+---
+
+## Step 4b: Endosymbiont decontamination (HISAT2)
+
+Script: [02_scripts/03b_decontam_hisat2.sh](../02_scripts/03b_decontam_hisat2.sh)
+
+Trimmed reads are aligned to a combined contaminant reference (mitochondria + three endosymbionts). Reads that do **not** map (i.e., putative host-derived reads) are retained for downstream analysis.
+
+- Tool: HISAT2 v2.2.2, samtools v1.23 (conda environment: `bioinfo`)
+- Input: `01_data/02_trimmed_fastq/SRR*_1.clean.fastq.gz`, `SRR*_2.clean.fastq.gz`
+- Reference index: built from `01_data/03_references/MEAM1_contiminants.fa`
 - Output:
-  - BAM files: `03_analysis/04_star_align/bam/`
-  - Combined counts: `03_analysis/04_star_align/counts/all_samples_genelevel.txt`
+  - Decontaminated FASTQ: `03_analysis/03_hisat2_decontam/unmapped_fastq/<sample>_unmapped.fastq.gz.1` / `.2`
+  - Contaminant BAMs: `03_analysis/03_hisat2_decontam/bam/<sample>.sorted.bam`
+  - Per-sample alignment summaries: `03_analysis/03_hisat2_decontam/summaries/<sample>.hisat2.summary.txt`
+- Key parameters:
+  - `--very-sensitive` — highest sensitivity preset
+  - `--no-unal` — suppress unaligned reads from SAM output
+  - `--un-conc-gz <prefix>` — write unmapped read pairs to gzipped FASTQ
+- SLURM resources: 24 CPUs, 100G RAM, partition `normal`, node `node06`
+
+---
+
+## Step 5: STAR alignment and featureCounts quantification
+
+Script: [02_scripts/04_star_align_counts.sh](../02_scripts/04_star_align_counts.sh)
+
+Decontaminated reads are aligned to the MEAM1 host genome using STAR and quantified with featureCounts.
+
+- Tools: STAR v2.7.11b (apptainer), featureCounts/Subread v2.1.1 (apptainer)
+- Input: `03_analysis/03_hisat2_decontam/unmapped_fastq/<sample>_unmapped.fastq.gz.1` / `.2`
+- Reference genome: `01_data/03_references/MEAM1_scaffold_v1.2.fa`
+- Reference annotation: `01_data/03_references/MEAM1_v1.2.gff3`
+- STAR index: `01_data/03_references/star_index/` (built on first run if directory absent)
+- Output:
+  - BAM files: `03_analysis/04_star_align/bam/<sample>_Aligned.sortedByCoord.out.bam`
+  - Combined count matrix: `03_analysis/04_star_align/counts/all_samples_genelevel.txt`
   - Per-sample counts: `03_analysis/04_star_align/counts/<sample>_genelevel.txt`
   - STAR logs: `03_analysis/04_star_align/logs/`
-- Samples: discovered dynamically from decontam output directory (no hardcoding)
+- STAR parameters:
+  - `--outSAMtype BAM SortedByCoordinate`
+  - `--sjdbGTFtagExonParentTranscript Parent` — GFF3 uses `Parent` to link exons to transcripts
+  - `--genomeSAindexNbases 12` — reduced suffix array index for the relatively small MEAM1 genome
+  - `--sjdbOverhang 99` — read length minus 1 for splice junction detection
+  - `--readFilesCommand zcat` — decompress gzipped input on the fly
+- featureCounts parameters:
+  - `-p` — paired-end mode
+  - `-t exon` — count reads overlapping exon features only (avoids inflating counts with intronic reads)
+  - `-g Parent` — group exons by transcript ID (the `Parent` attribute in MEAM1 GFF3 resolves to transcript IDs such as `Bta00001-mRNA`; genes are predominantly single-isoform so transcript counts are effectively gene-level)
 - SLURM resources: 24 CPUs, 64G RAM, partition `normal`, node `node06`
 
+---
+
+## Step 6: Differential expression — virus vs control
+
+Scripts: [02_scripts/05_deseq2.sh](../02_scripts/05_deseq2.sh), [02_scripts/05_deseq2.R](../02_scripts/05_deseq2.R)
+
+- Tool: DESeq2 (R), executed via conda environment `rnaseq`
+- Input: `03_analysis/04_star_align/counts/all_samples_genelevel.txt`, `00_meta/sample_metadata.csv`
+- Output: `03_analysis/05_deseq2/`
+
+### Statistical design
+
+| Analysis | DESeq2 design | Contrast |
+|---|---|---|
+| Overall virus effect | `~ Time_Point + Group` | virus vs control |
+| 24h subset | `~ Group` | virus vs control |
+| 48h subset | `~ Group` | virus vs control |
+| 72h subset | `~ Group` | virus vs control |
+
+- Reference levels: `control` (Group), `24h` (Time_Point)
+- Low-count pre-filter: genes with < 10 total counts across all samples removed before fitting
+- P-value adjustment: Benjamini-Hochberg (BH) FDR
+
+### Significance cutoffs applied
+
+| Label | Criteria |
+|---|---|
+| `lfc1` | padj < 0.05 & \|log2FoldChange\| > 1 (≥ 2-fold) |
+| `lfc058` | padj < 0.05 & \|log2FoldChange\| > 0.58 (≥ 1.5-fold) |
+| `pval` | padj < 0.05 (no fold-change filter) |
+
+### Outputs per analysis
+
+- Tables: `_all.csv` (all genes), `_sig_lfc1.csv`, `_sig_lfc058.csv`, `_sig_pval.csv`
+- Plots (overall only): PCA, sample distance heatmap, top DEG heatmap
+- Plots (all analyses): volcano plots × 3 cutoffs, MA plots × 3 cutoffs
+
+- SLURM resources: 4 CPUs, 32G RAM, partition `normal`, node `node06`
+
+---
+
+## Step 7: Differential expression — time-point contrasts
+
+Scripts: [02_scripts/06_time_contrasts.sh](../02_scripts/06_time_contrasts.sh), [02_scripts/06_time_contrasts.R](../02_scripts/06_time_contrasts.R)
+
+- Tool: DESeq2 (R), executed via conda environment `rnaseq`
+- Input: same count matrix and metadata as Step 6
+- Output: `03_analysis/06_time_contrasts/`
+
+### Statistical design
+
+Three parallel analyses, each testing 48h vs 24h and 72h vs 24h (24h as reference):
+
+| Analysis | DESeq2 design | Samples used |
+|---|---|---|
+| A. Overall time effect | `~ Group + Time_Point` | All 18 (Group as covariate) |
+| B. Virus group time effect | `~ Time_Point` | 9 virus samples only |
+| C. Control group time effect | `~ Time_Point` | 9 control samples only |
+
+- For analyses B and C, `fitType = "local"` is used as a safeguard for the smaller per-group sample size
+- Row-level count filter applied per subset: genes with < 10 total counts within that subset removed
+
+### Contrasts and output labels
+
+| Label | Comparison |
+|---|---|
+| `overall_48h_vs_24h` | 48h vs 24h, all samples |
+| `overall_72h_vs_24h` | 72h vs 24h, all samples |
+| `virus_48h_vs_24h` | 48h vs 24h, virus group |
+| `virus_72h_vs_24h` | 72h vs 24h, virus group |
+| `control_48h_vs_24h` | 48h vs 24h, control group |
+| `control_72h_vs_24h` | 72h vs 24h, control group |
+
+### Outputs per contrast
+
+- Tables: `<label>_all.csv`, `<label>_sig_lfc1.csv`, `<label>_sig_lfc058.csv`, `<label>_sig_pval.csv`
+- Plots: volcano plots × 3 cutoffs, MA plots × 3 cutoffs, top DEG heatmap (lfc1 cutoff)
+
+- SLURM resources: 4 CPUs, 32G RAM, partition `normal`, node `node06`
+
+---
+
 ## Software versions
-All module versions are appended to [00_meta/software_versions.txt](00_meta/software_versions.txt) during each step.
+
+All module versions are appended to [00_meta/software_versions.txt](software_versions.txt) at runtime during each step.
+
+| Tool | Version | Environment |
+|---|---|---|
+| fasterq-dump | — | module |
+| FastQC | v0.12.1 | module |
+| MultiQC | v1.9 | module |
+| fastp | v0.20.1 | module |
+| HISAT2 | v2.2.2 | conda: bioinfo |
+| samtools | v1.23 | conda: bioinfo |
+| STAR | v2.7.11b | apptainer |
+| featureCounts (Subread) | v2.1.1 | apptainer |
+| DESeq2 | v1.50+ | conda: rnaseq |
+| ggplot2 | — | conda: rnaseq |
+| pheatmap | — | conda: rnaseq |
+| RColorBrewer | — | conda: rnaseq |
