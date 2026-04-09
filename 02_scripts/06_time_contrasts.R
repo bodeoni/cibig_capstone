@@ -124,7 +124,36 @@ make_heatmap <- function(sig_df, vsd, meta, ann_colors, label, title, out_dir) {
   }
 }
 
-# Filter at 3 cutoffs, write tables, produce 3 volcanos + 1 heatmap (lfc1)
+# MA plot (coloured by lfc1 significance)
+make_ma <- function(res_df, title, out_path_base) {
+  ma <- res_df[!is.na(res_df$padj) & !is.na(res_df$log2FoldChange), ]
+  ma$sig <- "Not significant"
+  ma$sig[ma$padj < 0.05 & ma$log2FoldChange >  1] <- "Up"
+  ma$sig[ma$padj < 0.05 & ma$log2FoldChange < -1] <- "Down"
+  ma$sig        <- factor(ma$sig, levels = c("Up", "Down", "Not significant"))
+  ma$mean_expr  <- log10(ma$baseMean + 1)
+
+  p <- ggplot(ma, aes(mean_expr, log2FoldChange, colour = sig)) +
+    geom_point(alpha = 0.4, size = 1) +
+    geom_hline(yintercept = c(-1, 0, 1),
+               linetype = c("dashed", "solid", "dashed"),
+               colour   = c("grey40", "black", "grey40")) +
+    scale_colour_manual(values = c("Up" = "#D6604D", "Down" = "#2166AC", "Not significant" = "grey70")) +
+    labs(
+      title  = paste0("MA plot: ", title),
+      x      = expression(log[10]~"mean expression"),
+      y      = expression(log[2]~"fold change"),
+      colour = NULL
+    ) +
+    theme_bw(base_size = 13) +
+    theme(plot.title = element_text(face = "bold"), legend.position = "top")
+
+  ggsave(paste0(out_path_base, ".pdf"), p, width = 7, height = 5, dpi = 300)
+  ggsave(paste0(out_path_base, ".png"), p, width = 7, height = 5, dpi = 300)
+  invisible(p)
+}
+
+# Filter at 3 cutoffs, write tables, produce 3 volcanos + MA plot + 1 heatmap (lfc1)
 run_contrast <- function(res_df, label, title, vsd, meta, ann_colors, out_dir) {
   res_df <- res_df[order(res_df$padj, na.last = TRUE), ]
 
@@ -148,6 +177,9 @@ run_contrast <- function(res_df, label, title, vsd, meta, ann_colors, out_dir) {
     make_volcano(res_df, cut$thresh, title,
       out_path_base = file.path(out_dir, "plots", paste0(label, "_volcano_", cut$tag)))
   }
+
+  make_ma(res_df, title,
+    out_path_base = file.path(out_dir, "plots", paste0(label, "_ma_plot")))
 
   # Heatmap uses lfc1 DEGs; falls back to lfc058 if lfc1 is empty
   hm_sig <- if (nrow(sig_lfc1) >= 2) sig_lfc1 else sig_lfc058
