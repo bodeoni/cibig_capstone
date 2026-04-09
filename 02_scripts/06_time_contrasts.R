@@ -124,29 +124,37 @@ make_heatmap <- function(sig_df, vsd, meta, ann_colors, label, title, out_dir) {
   }
 }
 
-# MA plot (coloured by lfc1 significance)
-make_ma <- function(res_df, title, out_path_base) {
+# MA plot (lfc_thresh = 0 → padj only colouring)
+make_ma <- function(res_df, lfc_thresh, title, out_path_base) {
   ma <- res_df[!is.na(res_df$padj) & !is.na(res_df$log2FoldChange), ]
   ma$sig <- "Not significant"
-  ma$sig[ma$padj < 0.05 & ma$log2FoldChange >  1] <- "Up"
-  ma$sig[ma$padj < 0.05 & ma$log2FoldChange < -1] <- "Down"
-  ma$sig        <- factor(ma$sig, levels = c("Up", "Down", "Not significant"))
-  ma$mean_expr  <- log10(ma$baseMean + 1)
+  if (lfc_thresh > 0) {
+    ma$sig[ma$padj < 0.05 & ma$log2FoldChange >  lfc_thresh] <- "Up"
+    ma$sig[ma$padj < 0.05 & ma$log2FoldChange < -lfc_thresh] <- "Down"
+  } else {
+    ma$sig[ma$padj < 0.05 & ma$log2FoldChange > 0] <- "Up"
+    ma$sig[ma$padj < 0.05 & ma$log2FoldChange < 0] <- "Down"
+  }
+  ma$sig       <- factor(ma$sig, levels = c("Up", "Down", "Not significant"))
+  ma$mean_expr <- log10(ma$baseMean + 1)
+  cut_lbl      <- if (lfc_thresh > 0) paste0("padj<0.05, |LFC|>", lfc_thresh) else "padj<0.05"
 
   p <- ggplot(ma, aes(mean_expr, log2FoldChange, colour = sig)) +
     geom_point(alpha = 0.4, size = 1) +
-    geom_hline(yintercept = c(-1, 0, 1),
-               linetype = c("dashed", "solid", "dashed"),
-               colour   = c("grey40", "black", "grey40")) +
+    geom_hline(yintercept = 0, linetype = "solid", colour = "black") +
     scale_colour_manual(values = c("Up" = "#D6604D", "Down" = "#2166AC", "Not significant" = "grey70")) +
     labs(
-      title  = paste0("MA plot: ", title),
-      x      = expression(log[10]~"mean expression"),
-      y      = expression(log[2]~"fold change"),
-      colour = NULL
+      title    = paste0("MA plot: ", title),
+      subtitle = cut_lbl,
+      x        = expression(log[10]~"mean expression"),
+      y        = expression(log[2]~"fold change"),
+      colour   = NULL
     ) +
     theme_bw(base_size = 13) +
     theme(plot.title = element_text(face = "bold"), legend.position = "top")
+
+  if (lfc_thresh > 0)
+    p <- p + geom_hline(yintercept = c(-lfc_thresh, lfc_thresh), linetype = "dashed", colour = "grey40")
 
   ggsave(paste0(out_path_base, ".pdf"), p, width = 7, height = 5, dpi = 300)
   ggsave(paste0(out_path_base, ".png"), p, width = 7, height = 5, dpi = 300)
@@ -178,8 +186,10 @@ run_contrast <- function(res_df, label, title, vsd, meta, ann_colors, out_dir) {
       out_path_base = file.path(out_dir, "plots", paste0(label, "_volcano_", cut$tag)))
   }
 
-  make_ma(res_df, title,
-    out_path_base = file.path(out_dir, "plots", paste0(label, "_ma_plot")))
+  for (cut in list(list(thresh = 1, tag = "lfc1"), list(thresh = 0.58, tag = "lfc058"), list(thresh = 0, tag = "pval"))) {
+    make_ma(res_df, cut$thresh, title,
+      out_path_base = file.path(out_dir, "plots", paste0(label, "_ma_", cut$tag)))
+  }
 
   # Heatmap uses lfc1 DEGs; falls back to lfc058 if lfc1 is empty
   hm_sig <- if (nrow(sig_lfc1) >= 2) sig_lfc1 else sig_lfc058
