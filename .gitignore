@@ -51,7 +51,19 @@ slurm-*.out
 *.txt
 #*.csv
 *.tab
+.docx
+.pptx
 
 # Intermediate files
 *.bam
 *.sam
+
+capstone_report.md
+
+build_presentation.py
+~$pstone_report.docx
+capstone_presentation.pptx
+.gitignore
+capstone_report.pdf
+capstone_report.docx
+capstone_presentation_Py.pptx
