@@ -58,6 +58,26 @@ slurm-*.out
 *.bam
 *.sam
 
+# 97_trinity_pipeline – de novo assembly exploratory pipeline
+# Scripts are tracked; everything else (data, outputs, logs) is excluded.
+# .gitkeep files are retained by the !**/.gitkeep rule above.
+97_trinity_pipeline/00_meta/*
+97_trinity_pipeline/01_data/*
+97_trinity_pipeline/03_analysis/01_trinity_assembly/*
+97_trinity_pipeline/03_analysis/02_trinotate/*
+97_trinity_pipeline/03_analysis/03_salmon_index/*
+97_trinity_pipeline/03_analysis/04_salmon_quant/*
+97_trinity_pipeline/03_analysis/05_deseq2/*
+97_trinity_pipeline/04_results/figures/pca/*
+97_trinity_pipeline/04_results/figures/volcano/*
+97_trinity_pipeline/04_results/figures/ma/*
+97_trinity_pipeline/04_results/figures/heatmaps/*
+97_trinity_pipeline/04_results/tables/deseq2/*
+97_trinity_pipeline/04_results/tables/annotation/*
+97_trinity_pipeline/04_results/tables/qc_stats/*
+97_trinity_pipeline/99_logs/*
+!97_trinity_pipeline/**/.gitkeep
+
 capstone_report.md
 
 build_presentation.py
