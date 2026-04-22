@@ -208,21 +208,91 @@ Three parallel analyses, each testing 48h vs 24h and 72h vs 24h (24h as referenc
 
 ---
 
+## Step 8: QC statistics extraction
+
+Scripts: [02_scripts/07_extract_stats.sh](../02_scripts/07_extract_stats.sh), [02_scripts/07_extract_stats.R](../02_scripts/07_extract_stats.R)
+
+- Tool: R, executed via conda environment `rnaseq`
+- Input: fastp JSON reports, HISAT2 alignment summaries, STAR logs, featureCounts summary file, DESeq2 sig tables
+- Output: `04_results/tables/qc_stats/`
+
+Parses all upstream pipeline outputs and consolidates them into structured CSV tables for reporting and visualisation:
+
+| Output file | Contents |
+|---|---|
+| `01_trimming_stats.csv` | Per-sample fastp metrics including read counts, Q30 %, GC %, duplication rate |
+| `02_decontamination_stats.csv` | Per-sample HISAT2 alignment rates to the combined contaminant reference |
+| `03_star_alignment_stats.csv` | Per-sample STAR alignment statistics (uniquely mapped, multi-mapped, unmapped) |
+| `04_featurecounts_stats.csv` | Per-sample featureCounts assignment rates |
+| `05_read_funnel.csv` | Read pairs remaining after each pipeline stage (raw → trimmed → decontaminated → uniquely aligned) |
+| `06_deg_summary.csv` | DEG counts (total, up-regulated, down-regulated) per comparison and cutoff |
+| `00_pipeline_summary.csv` | Wide-format merge of all per-sample metrics |
+
+---
+
+## Step 9: QC visualisation
+
+Scripts: [02_scripts/08_plot_qc_stats.sh](../02_scripts/08_plot_qc_stats.sh), [02_scripts/08_plot_qc_stats.R](../02_scripts/08_plot_qc_stats.R)
+
+- Tool: R (ggplot2, pheatmap, ggrepel, scales, grid), executed via conda environment `rnaseq`
+- Input: tables from Step 8
+- Output: `04_results/figures/qc_plots/` — PNG and PDF versions of each figure
+
+Generates 12 publication-quality figures covering every stage of the pipeline:
+
+| Figure | Type | Description |
+|---|---|---|
+| `01_pipeline_read_funnel` | Bar | Read pairs retained at each stage |
+| `02_raw_read_counts` | Bar | Per-sample raw read counts |
+| `03_trimming_filter_reasons` | Stacked bar | Reads removed by fastp by reason |
+| `04_q30_before_after` | Paired dot | Q30 % before vs after trimming |
+| `05_gc_content_before_after` | Paired dot | GC % before vs after trimming |
+| `06_decontam_rate_per_sample` | Bar | Endosymbiont mapping rate per sample |
+| `07_decontam_stacked_bar` | Stacked bar | Host vs contaminant read proportions |
+| `08_star_alignment_stacked` | Stacked bar | STAR alignment category proportions |
+| `09_star_uniquely_mapped_scatter` | Scatter | Uniquely mapped read count per sample |
+| `10_featurecounts_stacked` | Stacked bar | featureCounts assignment categories |
+| `11_featurecounts_assigned_dot` | Dot | Fraction of reads assigned to genes |
+| `12_qc_summary_heatmap` | Heatmap | All QC metrics scaled across samples |
+
+Samples are ordered by time point then group (control before virus) throughout. A manifest (`00_plot_manifest.csv`) is written on completion.
+
+- SLURM resources: 4 CPUs, 16G RAM, partition `normal`, node `node06`
+
+---
+
 ## Software versions
 
 All module versions are appended to [00_meta/software_versions.txt](software_versions.txt) at runtime during each step.
 
-| Tool | Version | Environment |
-|---|---|---|
-| fasterq-dump | — | module |
-| FastQC | v0.12.1 | module |
-| MultiQC | v1.9 | module |
-| fastp | v0.20.1 | module |
-| HISAT2 | v2.2.2 | conda: bioinfo |
-| samtools | v1.23 | conda: bioinfo |
-| STAR | v2.7.11b | apptainer |
-| featureCounts (Subread) | v2.1.1 | apptainer |
-| DESeq2 | v1.50+ | conda: rnaseq |
-| ggplot2 | — | conda: rnaseq |
-| pheatmap | — | conda: rnaseq |
-| RColorBrewer | — | conda: rnaseq |
+| Tool | Version | Steps | Environment |
+|---|---|---|---|
+| fasterq-dump | — | 1 | module |
+| FastQC | v0.12.1 | 2 | module |
+| MultiQC | v1.9 | 2–3 | module |
+| fastp | v0.20.1 | 3 | module |
+| HISAT2 | v2.2.2 | 4 | conda: bioinfo |
+| samtools | v1.23 | 4 | conda: bioinfo |
+| STAR | v2.7.11b | 5 | apptainer |
+| featureCounts (Subread) | v2.1.1 | 5 | apptainer |
+| DESeq2 | v1.50+ | 6–7 | conda: rnaseq |
+| ggplot2 | — | 6–9 | conda: rnaseq |
+| pheatmap | — | 6–9 | conda: rnaseq |
+| RColorBrewer | — | 6–9 | conda: rnaseq |
+| ggrepel | — | 6–9 | conda: rnaseq |
+| scales | — | 8–9 | conda: rnaseq |
+
+---
+
+## Future work: Trinity de novo assembly pipeline
+
+Scripts prepared in `97_trinity_pipeline/02_scripts/` but not executed as part of the capstone. The pipeline was designed as an alternative approach that avoids dependence on the MEAM1 reference genome by assembling a transcriptome directly from the experimental reads.
+
+Planned pipeline:
+1. `01_trinity_assembly.sh` — de novo assembly of all 18 decontaminated samples with Trinity; `--normalize_reads --normalize_max_cov 50`
+2. `02_trinotate.sh` — functional annotation of the assembled transcriptome with Trinotate
+3. `03_salmon_index.sh` — build a Salmon index from the Trinity assembly
+4. `04_salmon_quant.sh` — quantify each sample against the assembly with Salmon
+5. `05_deseq2.R` — differential expression analysis using tximport + DESeq2
+
+This approach would allow comparison of reference-based and reference-free DE results, and would enable functional annotation of differentially expressed transcripts. It remains as a planned next step beyond the capstone submission.

@@ -67,7 +67,7 @@ Full metadata: `00_meta/sample_metadata.csv`
 
 ## Pipeline Overview
 
-The pipeline runs in 7 sequential steps. All SLURM scripts are in `02_scripts/` and should be submitted from the cluster working directory `/scratch/onilee/capstone`.
+The pipeline runs in 9 sequential steps. All SLURM scripts are in `02_scripts/` and should be submitted from the cluster working directory `/scratch/onilee/capstone`.
 
 ```
 Raw SRA files
@@ -92,6 +92,12 @@ Differential expression: virus vs control (overall + per time point)
     │
     ▼ 06_time_contrasts.sh  (→ 06_time_contrasts.R)
 Differential expression: time-point effects (overall, virus-only, control-only)
+    │
+    ▼ 07_extract_stats.sh  (→ 07_extract_stats.R)
+QC statistics tables (trimming, decontamination, alignment, DEG summary)
+    │
+    ▼ 08_plot_qc_stats.sh  (→ 08_plot_qc_stats.R)
+QC visualisation plots (12 figures)
 ```
 
 ---
@@ -252,7 +258,57 @@ Three analyses, each with contrasts 48h vs 24h and 72h vs 24h:
 
 - Output directory: `03_analysis/06_time_contrasts/`
 - Per contrast: 4 tables (`_all`, `_sig_lfc1`, `_sig_lfc058`, `_sig_pval`), 3 volcano plots, 3 MA plots, 1 heatmap (top DEGs at lfc1 cutoff)
-- Key results copied to `04_results/`
+
+---
+
+### Step 8: QC Statistics Extraction
+
+```bash
+sbatch 02_scripts/07_extract_stats.sh
+```
+
+Calls `07_extract_stats.R` via the `rnaseq` conda environment. Parses outputs from all upstream steps and consolidates them into summary tables.
+
+- Input: fastp JSON reports, HISAT2 summaries, STAR logs, featureCounts summary, DESeq2 tables
+- Output: `04_results/tables/qc_stats/`
+
+| File | Contents |
+|---|---|
+| `01_trimming_stats.csv` | Per-sample fastp metrics (reads, Q30, GC, duplication rate) |
+| `02_decontamination_stats.csv` | Per-sample HISAT2 alignment to contaminant reference |
+| `03_star_alignment_stats.csv` | Per-sample STAR alignment statistics |
+| `04_featurecounts_stats.csv` | Per-sample featureCounts assignment rates |
+| `05_read_funnel.csv` | Read pairs at each pipeline stage (raw → trimmed → decontaminated → aligned) |
+| `06_deg_summary.csv` | DEG counts (total / up / down) per comparison and significance cutoff |
+| `00_pipeline_summary.csv` | Merged per-sample summary across all steps |
+
+---
+
+### Step 9: QC Visualisation
+
+```bash
+sbatch 02_scripts/08_plot_qc_stats.sh
+```
+
+Calls `08_plot_qc_stats.R` via the `rnaseq` conda environment. Generates 12 publication-quality figures from the QC statistics tables.
+
+- Input: tables from Step 8 (`04_results/tables/qc_stats/`)
+- Output: `04_results/figures/qc_plots/` (PNG + PDF for each figure)
+
+| Figure | Description |
+|---|---|
+| `01_pipeline_read_funnel` | Read pairs retained at each pipeline stage |
+| `02_raw_read_counts` | Per-sample raw read counts |
+| `03_trimming_filter_reasons` | Breakdown of reads removed by fastp |
+| `04_q30_before_after` | Q30 percentage before vs after trimming |
+| `05_gc_content_before_after` | GC content before vs after trimming |
+| `06_decontam_rate_per_sample` | Endosymbiont contamination rate per sample |
+| `07_decontam_stacked_bar` | Stacked bar: host vs contaminant reads |
+| `08_star_alignment_stacked` | Stacked bar: STAR alignment categories |
+| `09_star_uniquely_mapped_scatter` | Uniquely mapped reads per sample (scatter) |
+| `10_featurecounts_stacked` | Stacked bar: featureCounts assignment categories |
+| `11_featurecounts_assigned_dot` | Fraction of reads assigned to genes (dot plot) |
+| `12_qc_summary_heatmap` | Heatmap of all QC metrics across samples |
 
 ---
 
@@ -288,21 +344,27 @@ cibig_capstone/
 │   ├── 03a_download_genomes.sh # Download reference genomes
 │   ├── 03b_decontam_hisat2.sh  # HISAT2 decontamination
 │   ├── 04_star_align_counts.sh # STAR alignment + featureCounts
-│   ├── 05_deseq2.sh            # SLURM wrapper for DESeq2 (virus vs control)
-│   ├── 05_deseq2.R             # DESeq2 R script
-│   ├── 06_time_contrasts.sh    # SLURM wrapper for time-point contrasts
-│   └── 06_time_contrasts.R     # Time-point contrast R script
+│   ├── 05_deseq2.sh / .R       # DESeq2: virus vs control
+│   ├── 06_time_contrasts.sh / .R  # DESeq2: time-point contrasts
+│   ├── 07_extract_stats.sh / .R   # QC statistics extraction
+│   └── 08_plot_qc_stats.sh / .R   # QC visualisation (12 figures)
 ├── 03_analysis/
 │   ├── 01_qc/                  # FastQC and MultiQC outputs
 │   ├── 02_fastp/               # fastp reports
 │   ├── 03_hisat2_decontam/     # Decontamination outputs
 │   ├── 04_star_align/          # BAM files and count matrix
-│   ├── 05_deseq2/              # DESeq2 results (tables + plots)
-│   └── 06_time_contrasts/      # Time-point contrast results (tables + plots)
+│   ├── 05_deseq2/              # DESeq2 results — virus vs control (tables + plots)
+│   └── 06_time_contrasts/      # DESeq2 results — time-point contrasts (tables + plots)
 ├── 04_results/
-│   ├── figures/                # Key plots (PNG)
-│   └── tables/                 # Significant DEG tables (CSV)
-├── 98_test_run/                # Test pipeline (3 samples; approach comparison)
+│   ├── figures/
+│   │   ├── qc_plots/           # 12 QC figures (PNG + PDF)
+│   │   └── time_contrasts/     # Time-point contrast plots
+│   ├── tables/
+│   │   ├── qc_stats/           # QC statistics CSVs (steps 8–9 output)
+│   │   └── time_contrasts/     # Significant DEG tables for time contrasts
+│   └── reports/                # Alignment summary reports
+├── 97_trinity_pipeline/        # Future work: Trinity de novo assembly pipeline (scripts prepared)
+├── 98_test_run/                # Preliminary work: approach comparison on 3-sample subset
 └── 99_logs/                    # SLURM log files
 ```
 
@@ -321,9 +383,11 @@ cibig_capstone/
 | STAR | v2.7.11b | Step 5 | apptainer |
 | featureCounts (Subread) | v2.1.1 | Step 5 | apptainer |
 | DESeq2 | v1.50+ | Steps 6–7 | conda: rnaseq |
-| ggplot2 | — | Steps 6–7 | conda: rnaseq |
-| pheatmap | — | Steps 6–7 | conda: rnaseq |
-| RColorBrewer | — | Steps 6–7 | conda: rnaseq |
+| ggplot2 | — | Steps 6–9 | conda: rnaseq |
+| pheatmap | — | Steps 6–9 | conda: rnaseq |
+| RColorBrewer | — | Steps 6–9 | conda: rnaseq |
+| ggrepel | — | Steps 6–9 | conda: rnaseq |
+| scales | — | Steps 8–9 | conda: rnaseq |
 
 Full version log: `00_meta/software_versions.txt`
 
