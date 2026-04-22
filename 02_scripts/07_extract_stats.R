@@ -79,6 +79,7 @@ if (length(json_files) == 0) {
       Reads_low_quality        = fr$low_quality_reads,
       Reads_too_short          = fr$too_short_reads,
       Reads_too_many_N         = fr$too_many_N_reads,
+      Duplication_Rate_pct     = round(j$duplication$rate * 100, 2),
       stringsAsFactors         = FALSE
     )
   })
@@ -274,9 +275,9 @@ cat("\nBuilding combined pipeline summary...\n")
 
 all_dfs <- list()
 
-if (exists("fastp_df"))  all_dfs[["fastp"]]  <- fastp_df[,  c("Sample", "Raw_Reads", "Reads_passed_filter_pct", "Clean_Q30_pct")]
+if (exists("fastp_df"))  all_dfs[["fastp"]]  <- fastp_df[,  c("Sample", "Raw_Reads", "Clean_Reads", "Reads_passed_filter_pct", "Clean_Q30_pct")]
 if (exists("hisat2_df")) all_dfs[["hisat2"]] <- hisat2_df[, c("Sample", "Mapped_to_contaminants_pct", "Retained_unmapped_pairs")]
-if (exists("star_df"))   all_dfs[["star"]]   <- star_df[,   c("Sample", "Input_Reads", "Uniquely_Mapped_pct", "Multi_Mapped_pct")]
+if (exists("star_df"))   all_dfs[["star"]]   <- star_df[,   c("Sample", "Input_Reads", "Uniquely_Mapped_Reads", "Uniquely_Mapped_pct", "Multi_Mapped_pct")]
 if (exists("fc_out"))    all_dfs[["fc"]]     <- fc_out[,    c("Sample", "Assigned_pct", "Unassigned_NoFeatures_pct", "Unassigned_Ambiguity_pct")]
 
 if (length(all_dfs) > 0) {
@@ -291,6 +292,132 @@ if (length(all_dfs) > 0) {
 
   cat("\n--- Pipeline summary (key metrics) ---\n")
   print(summary_df, row.names = FALSE)
+}
+
+# =============================================================================
+# 6. READ FUNNEL — absolute counts at each pipeline step (read pairs)
+# =============================================================================
+# All values expressed as READ PAIRS for consistency:
+#   fastp reports individual reads (paired-end = 2 reads per pair) → divide by 2
+#   HISAT2 Retained_unmapped_pairs is already pair-level
+#   STAR   Input_Reads and Uniquely_Mapped_Reads are pair-level
+# =============================================================================
+
+cat("\nBuilding read funnel table...\n")
+
+funnel_dfs <- list()
+if (exists("fastp_df"))  funnel_dfs[["fastp"]]  <- fastp_df[,  c("Sample", "Raw_Reads", "Clean_Reads")]
+if (exists("hisat2_df")) funnel_dfs[["hisat2"]] <- hisat2_df[, c("Sample", "Retained_unmapped_pairs")]
+if (exists("star_df"))   funnel_dfs[["star"]]   <- star_df[,   c("Sample", "Uniquely_Mapped_Reads")]
+
+if (length(funnel_dfs) > 0) {
+  funnel_df <- Reduce(function(a, b) merge(a, b, by = "Sample", all = TRUE), funnel_dfs)
+  funnel_df <- funnel_df[order(funnel_df$Sample), ]
+
+  # Convert individual read counts to pairs where needed
+  funnel_df$Raw_Pairs           <- funnel_df$Raw_Reads   / 2
+  funnel_df$Post_Trim_Pairs     <- funnel_df$Clean_Reads / 2
+  funnel_df$Post_Decontam_Pairs <- funnel_df$Retained_unmapped_pairs
+  funnel_df$Uniquely_Mapped_Pairs <- funnel_df$Uniquely_Mapped_Reads
+
+  # Percentage retained at each step relative to raw
+  funnel_df$Trim_Pct            <- pct(funnel_df$Post_Trim_Pairs,     funnel_df$Raw_Pairs)
+  funnel_df$Decontam_Pct        <- pct(funnel_df$Post_Decontam_Pairs, funnel_df$Raw_Pairs)
+  funnel_df$Uniquely_Mapped_Pct <- pct(funnel_df$Uniquely_Mapped_Pairs, funnel_df$Raw_Pairs)
+
+  funnel_out <- funnel_df[, c(
+    "Sample",
+    "Raw_Pairs", "Post_Trim_Pairs", "Post_Decontam_Pairs", "Uniquely_Mapped_Pairs",
+    "Trim_Pct",  "Decontam_Pct",    "Uniquely_Mapped_Pct"
+  )]
+
+  write.csv(funnel_out,
+    file.path(out_dir, "05_read_funnel.csv"),
+    row.names = FALSE)
+
+  cat(sprintf("  Built funnel for %d samples → 05_read_funnel.csv\n", nrow(funnel_out)))
+  cat("\n--- Read Funnel (pairs) ---\n")
+  print(funnel_out, row.names = FALSE)
+}
+
+# =============================================================================
+# 7. DEG SUMMARY — total / up / down per comparison per significance cutoff
+# =============================================================================
+# Reads all *_sig_lfc1.csv, *_sig_lfc058.csv, *_sig_pval.csv files from
+# both the DESeq2 and time-contrast output table directories, then builds
+# one tidy summary row per (comparison × cutoff) combination.
+# =============================================================================
+
+cat("\nBuilding DEG summary table...\n")
+
+deseq2_tbl_dir  <- file.path(base_dir, "03_analysis/05_deseq2/tables")
+contrast_tbl_dir <- file.path(base_dir, "03_analysis/06_time_contrasts/tables")
+
+sig_pattern <- "_sig_(lfc1|lfc058|pval)\\.csv$"
+
+collect_sig_files <- function(dir, source_label) {
+  if (!dir.exists(dir)) {
+    cat("  WARNING: directory not found:", dir, "\n")
+    return(NULL)
+  }
+  files <- list.files(dir, pattern = sig_pattern, full.names = TRUE)
+  if (length(files) == 0) {
+    cat("  WARNING: no sig files found in", dir, "\n")
+    return(NULL)
+  }
+  do.call(rbind, lapply(files, function(f) {
+    fname  <- basename(f)
+    cutoff <- gsub(paste0(".*", sig_pattern), "\\1", fname)
+    comp   <- gsub(sig_pattern, "", fname)
+    comp   <- gsub("^deseq2_", "", comp)   # strip deseq2_ prefix if present
+
+    df <- tryCatch(
+      read.csv(f, stringsAsFactors = FALSE),
+      error = function(e) { cat("  WARNING: could not read", fname, "\n"); NULL }
+    )
+    n_total <- if (is.null(df)) 0L else nrow(df)
+    n_up    <- if (is.null(df) || n_total == 0) 0L else sum(df$log2FoldChange > 0, na.rm = TRUE)
+    n_dn    <- if (is.null(df) || n_total == 0) 0L else sum(df$log2FoldChange < 0, na.rm = TRUE)
+
+    data.frame(
+      Source     = source_label,
+      Comparison = comp,
+      Cutoff     = cutoff,
+      Total_DEGs = n_total,
+      Up         = n_up,
+      Down       = n_dn,
+      stringsAsFactors = FALSE
+    )
+  }))
+}
+
+deg_parts <- list(
+  collect_sig_files(deseq2_tbl_dir,  "virus_vs_control"),
+  collect_sig_files(contrast_tbl_dir, "time_contrasts")
+)
+deg_parts <- Filter(Negate(is.null), deg_parts)
+
+if (length(deg_parts) > 0) {
+  deg_summary <- do.call(rbind, deg_parts)
+
+  # Readable cutoff labels
+  deg_summary$Cutoff <- factor(
+    deg_summary$Cutoff,
+    levels = c("lfc1", "lfc058", "pval"),
+    labels = c("lfc1 (|LFC|>1)", "lfc058 (|LFC|>0.58)", "pval (padj<0.05)")
+  )
+
+  # Order: comparison, then cutoff
+  deg_summary <- deg_summary[order(deg_summary$Source, deg_summary$Comparison,
+                                    deg_summary$Cutoff), ]
+
+  write.csv(deg_summary,
+    file.path(out_dir, "06_deg_summary.csv"),
+    row.names = FALSE)
+
+  cat(sprintf("  %d rows → 06_deg_summary.csv\n", nrow(deg_summary)))
+  cat("\n--- DEG Summary ---\n")
+  print(deg_summary, row.names = FALSE)
 }
 
 cat("\n=== Extraction Complete:", format(Sys.time()), "===\n")

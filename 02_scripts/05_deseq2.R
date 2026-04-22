@@ -178,6 +178,16 @@ keep <- rowSums(counts(dds)) >= 10
 dds  <- dds[keep, ]
 cat("  Genes retained after low-count filter:", nrow(dds), "\n")
 
+write.csv(
+  data.frame(
+    Total_Genes_Quantified = nrow(counts),
+    Genes_Passing_Filter   = sum(keep),
+    Genes_Tested           = nrow(dds)
+  ),
+  file.path(out_dir, "tables", "genes_tested.csv"),
+  row.names = FALSE
+)
+
 dds <- DESeq(dds)
 
 cat("  DESeq2 complete\n")
@@ -231,6 +241,12 @@ vsd <- vst(dds, blind = TRUE)
 
 pca_data <- plotPCA(vsd, intgroup = c("Group", "Time_Point"), returnData = TRUE)
 pct_var  <- round(100 * attr(pca_data, "percentVar"))
+
+write.csv(
+  data.frame(PC = paste0("PC", seq_along(pct_var)), Variance_Pct = pct_var),
+  file.path(out_dir, "tables", "pca_variance.csv"),
+  row.names = FALSE
+)
 
 pca_plot <- ggplot(pca_data, aes(PC1, PC2, colour = Group, shape = Time_Point)) +
   geom_point(size = 4, alpha = 0.9) +

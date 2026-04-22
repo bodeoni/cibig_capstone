@@ -257,6 +257,18 @@ dds_A  <- DESeqDataSetFromMatrix(counts[keep_A, ], meta, design = ~ Group + Time
 dds_A  <- DESeq(dds_A)
 vsd_A  <- vst(dds_A, blind = TRUE)
 
+write.csv(
+  data.frame(
+    Analysis               = "A_overall_time",
+    Total_Genes_Quantified = nrow(counts),
+    Genes_Passing_Filter   = sum(keep_A),
+    Genes_Tested           = nrow(dds_A)
+  ),
+  file.path(out_dir, "tables", "genes_tested_A.csv"),
+  row.names = FALSE
+)
+cat("  Genes passing filter (Analysis A):", sum(keep_A), "\n")
+
 for (ctp in list(c("48h", "24h"), c("72h", "24h"))) {
   tp_num <- ctp[1]; tp_ref <- ctp[2]
   label  <- paste0("overall_", tp_num, "_vs_", tp_ref)
