@@ -14,7 +14,7 @@ venv/
 # Data & outputs
 01_data/*
 03_analysis/*
-04_results/*
+#04_results/*
 99_logs/*
 98_test_run/*
 !98_test_run/04_scripts/
@@ -90,3 +90,10 @@ capstone_presentation_Py.pptx
 .ipynb_checkpoints
 report.pdf
 00_meta/project_context.md
+.codex
+*.pdf
+*.docx
+*.pptx
+
+Reports
+.codex
