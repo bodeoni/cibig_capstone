@@ -110,11 +110,11 @@ echo "  OK: decontamination directory found"
 
 # Discover R1 (*.1) and R2 (*.2) files
 # HISAT2 --un-conc-gz with a .gz prefix produces files ending in .gz.1 / .gz.2
-r1_files=("${DECONTAM_DIR}"/*_unmapped.fastq.gz.1)
-r2_files=("${DECONTAM_DIR}"/*_unmapped.fastq.gz.2)
+r1_files=("${DECONTAM_DIR}"/*_unmapped.fastq.1.gz)
+r2_files=("${DECONTAM_DIR}"/*_unmapped.fastq.2.gz)
 
 if [ "${#r1_files[@]}" -eq 0 ] || [ ! -f "${r1_files[0]}" ]; then
-    echo "ERROR: No R1 files (*_unmapped.fastq.gz.1) found in:"
+    echo "ERROR: No R1 files (*_unmapped.fastq.1.gz) found in:"
     echo "  ${DECONTAM_DIR}"
     exit 1
 fi
@@ -130,7 +130,7 @@ echo "  OK: found ${#r1_files[@]} R1/R2 file pairs"
 echo ""
 echo "  Samples to assemble:"
 for r1 in "${r1_files[@]}"; do
-    sample=$(basename "${r1}" _unmapped.fastq.gz.1)
+    sample=$(basename "${r1}" _unmapped.fastq.1.gz)
     echo "    ${sample}"
 done
 
