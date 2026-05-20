@@ -44,10 +44,13 @@ echo "=============================================="
 # MODULES
 # =============================================================================
 
-module load bioinfo-shared trinity
+module load apptainer
+
+SIF="/projects/onilee/software/containers/trinity_2.15.2.sif"
+APPTAINER_BINDS="/scratch,/projects"
 
 echo ""
-echo "Trinity version: $(Trinity --version 2>&1 | head -1)"
+echo "Trinity version: $(apptainer exec --bind "${APPTAINER_BINDS}" "${SIF}" Trinity --version 2>&1 | head -1)"
 echo ""
 
 # =============================================================================
@@ -183,7 +186,7 @@ echo "Started: $(date)"
 echo "=========================================="
 echo ""
 
-Trinity \
+apptainer exec --bind "${APPTAINER_BINDS}" "${SIF}" Trinity \
     --seqType      fq \
     --left         "${LEFT_FILES}" \
     --right        "${RIGHT_FILES}" \
@@ -219,10 +222,10 @@ fi
 # transcript and gene counts
 echo ""
 echo "--- TrinityStats.pl ---"
-TrinityStats.pl "${FASTA}"
+apptainer exec --bind "${APPTAINER_BINDS}" "${SIF}" TrinityStats.pl "${FASTA}"
 
 # Save stats to file for records
-TrinityStats.pl "${FASTA}" > "${TRINITY_DIR}/99_logs/trinity_assembly_stats_${SLURM_JOB_ID}.txt" 2>&1
+apptainer exec --bind "${APPTAINER_BINDS}" "${SIF}" TrinityStats.pl "${FASTA}" > "${TRINITY_DIR}/99_logs/trinity_assembly_stats_${SLURM_JOB_ID}.txt" 2>&1
 echo ""
 echo "Stats saved to: ${TRINITY_DIR}/99_logs/trinity_assembly_stats_${SLURM_JOB_ID}.txt"
 
