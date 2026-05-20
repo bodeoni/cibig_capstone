@@ -44,7 +44,7 @@ echo "=============================================="
 # MODULES
 # =============================================================================
 
-module load apptainer
+module load bioinfo-wave apptainer
 
 SIF="/projects/onilee/software/containers/trinity_2.15.2.sif"
 APPTAINER_BINDS="/scratch,/projects"
