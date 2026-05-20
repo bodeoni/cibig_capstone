@@ -190,7 +190,6 @@ apptainer exec --bind "${APPTAINER_BINDS}" "${SIF}" Trinity \
     --seqType      fq \
     --left         "${LEFT_FILES}" \
     --right        "${RIGHT_FILES}" \
-    #--SS_lib_type  "${SS_LIB_TYPE}" \
     --CPU          "${THREADS}" \
     --max_memory   "${MAX_MEM}" \
     --output       "${ASSEMBLY_DIR}" \
