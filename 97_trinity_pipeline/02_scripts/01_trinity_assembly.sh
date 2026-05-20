@@ -2,9 +2,8 @@
 #SBATCH --job-name=trinity_assembly
 #SBATCH --output=/scratch/onilee/capstone/97_trinity_pipeline/99_logs/01_trinity_assembly_%j.log
 #SBATCH --error=/scratch/onilee/capstone/97_trinity_pipeline/99_logs/01_trinity_assembly_%j.err
-#SBATCH --cpus-per-task=24
-#SBATCH --mem=200G
-#SBATCH --time=5-00:00:00
+#SBATCH --cpus-per-task=12
+#SBATCH --mem=100G
 #SBATCH --partition=normal
 #SBATCH --nodelist=node06
 
@@ -68,7 +67,7 @@ LOG_DIR="${TRINITY_DIR}/99_logs"
 
 # Resources (keep in sync with #SBATCH headers above)
 THREADS=12
-MAX_MEM="200G"
+MAX_MEM="100G"
 
 # Strand specificity
 # If the library was prepared with a strand-preserving protocol (e.g. Illumina
