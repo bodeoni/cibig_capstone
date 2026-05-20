@@ -83,12 +83,8 @@ MAX_MEM="100G"
 #
 #SS_LIB_TYPE="RF"
 
-# In-silico normalisation cap (max coverage per k-mer)
-# Trinity's built-in normalisation reduces the read set to ≤50× k-mer coverage
-# before assembly. This dramatically lowers memory and runtime for large
-# datasets with no meaningful loss in assembly quality. Strongly recommended
-# when total input exceeds ~300 M read pairs.
-NORMALIZE_MAX_COV=50
+# In-silico normalisation is enabled by default in Trinity 2.15+.
+# Use --no_normalize_reads to disable it if needed.
 
 mkdir -p "${LOG_DIR}"
 
@@ -173,7 +169,7 @@ echo "  Output dir:     ${ASSEMBLY_DIR}"
 echo "  CPUs:           ${THREADS}"
 echo "  Max memory:     ${MAX_MEM}"
 #echo "  Strand type:    ${SS_LIB_TYPE:-unstranded}"
-echo "  Norm. max cov:  ${NORMALIZE_MAX_COV}x"
+echo "  Normalisation:  enabled (Trinity default)"
 echo ""
 
 # =============================================================================
@@ -193,8 +189,6 @@ apptainer exec --bind "${APPTAINER_BINDS}" "${SIF}" Trinity \
     --CPU          "${THREADS}" \
     --max_memory   "${MAX_MEM}" \
     --output       "${ASSEMBLY_DIR}" \
-    --normalize_reads \
-    --normalize_max_cov "${NORMALIZE_MAX_COV}" \
     --verbose
 
 echo ""
