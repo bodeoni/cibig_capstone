@@ -64,8 +64,8 @@ LOG_DIR="${TRINITY_DIR}/99_logs"
 FASTA="${ASSEMBLY_DIR}/Trinity.fasta"
 
 # BUSCO settings
-BUSCO_LINEAGE="insecta_odb10"    # swap to hemiptera_odb10 for a finer-grained check
-BUSCO_OUT_NAME="busco_${BUSCO_LINEAGE%_odb10}"   # → busco_insecta
+BUSCO_LINEAGE="insecta_odb12"    # swap to hemiptera_odb10 for a finer-grained check
+BUSCO_OUT_NAME="busco_${BUSCO_LINEAGE%_odb12}"   # → busco_insecta
 BUSCO_OUT_DIR="${STATS_DIR}/${BUSCO_OUT_NAME}"
 BUSCO_LINEAGE_PATH="/projects/onilee/databases/lineages/${BUSCO_LINEAGE}"
 
