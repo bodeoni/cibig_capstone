@@ -67,10 +67,11 @@ FASTA="${ASSEMBLY_DIR}/Trinity.fasta"
 BUSCO_LINEAGE="insecta_odb10"    # swap to hemiptera_odb10 for a finer-grained check
 BUSCO_OUT_NAME="busco_${BUSCO_LINEAGE%_odb10}"   # → busco_insecta
 BUSCO_OUT_DIR="${STATS_DIR}/${BUSCO_OUT_NAME}"
-# BUSCO expects --download_path to be the parent of lineages/, i.e. the directory
-# that contains a lineages/ subdirectory.  It then finds the lineage at:
-#   ${BUSCO_DOWNLOAD_PATH}/lineages/${BUSCO_LINEAGE}
-BUSCO_DOWNLOAD_PATH="/projects/onilee/databases"
+# /projects is read-only on compute nodes — BUSCO's download manager will crash
+# if --download_path points there even with --offline.  Solution: use a writable
+# scratch directory and symlink the lineage in so BUSCO can read it.
+BUSCO_LINEAGE_SRC="/projects/onilee/databases/lineages/${BUSCO_LINEAGE}"
+BUSCO_DOWNLOAD_PATH="/scratch/onilee/busco_downloads"
 BUSCO_LINEAGE_PATH="${BUSCO_DOWNLOAD_PATH}/lineages/${BUSCO_LINEAGE}"
 
 THREADS=12
@@ -103,13 +104,23 @@ echo "    Size:        ${FASTA_SIZE}"
 echo "    Transcripts: ${N_TRANSCRIPTS}"
 echo ""
 
-if [ ! -d "${BUSCO_LINEAGE_PATH}" ]; then
+if [ ! -d "${BUSCO_LINEAGE_SRC}" ]; then
     echo "ERROR: BUSCO lineage not found at:"
-    echo "  ${BUSCO_LINEAGE_PATH}"
-    echo "  Check that the lineage directory exists under /projects/onilee/databases/lineages/"
+    echo "  ${BUSCO_LINEAGE_SRC}"
     exit 1
 fi
-echo "  OK: BUSCO lineage found: ${BUSCO_LINEAGE_PATH}"
+echo "  OK: BUSCO lineage source: ${BUSCO_LINEAGE_SRC}"
+
+# Create writable download_path structure and symlink the lineage in.
+# BUSCO tries to makedirs(download_path) even with --offline; /projects is
+# read-only on compute nodes so we redirect it to scratch instead.
+mkdir -p "${BUSCO_DOWNLOAD_PATH}/lineages"
+if [ ! -L "${BUSCO_LINEAGE_PATH}" ] && [ ! -d "${BUSCO_LINEAGE_PATH}" ]; then
+    ln -s "${BUSCO_LINEAGE_SRC}" "${BUSCO_LINEAGE_PATH}"
+    echo "  Symlinked lineage: ${BUSCO_LINEAGE_PATH} -> ${BUSCO_LINEAGE_SRC}"
+else
+    echo "  Lineage already present: ${BUSCO_LINEAGE_PATH}"
+fi
 echo ""
 
 # =============================================================================
