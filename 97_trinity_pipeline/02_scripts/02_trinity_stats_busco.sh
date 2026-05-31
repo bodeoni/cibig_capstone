@@ -15,11 +15,11 @@
 #   1. TrinityStats.pl — basic assembly statistics (N50, contig count, total
 #      bases, ExN50 profile). Ships inside the Trinity container so no extra
 #      install needed.
-#   2. BUSCO (transcriptome mode, insecta_odb10) — benchmarks against single-
+#   2. BUSCO (transcriptome mode, insecta_odb12) — benchmarks against single-
 #      copy orthologs shared across insects to estimate assembly completeness.
-#      Bemisia tabaci is an insect (Hemiptera: Aleyrodidae); insecta_odb10 is
-#      the standard lineage used in published B. tabaci transcriptome papers.
-#      If you want a more specific lineage, swap in hemiptera_odb10.
+#      Bemisia tabaci is an insect (Hemiptera: Aleyrodidae); insecta_odb12 is
+#      the most current lineage. If you want a finer-grained check, swap in
+#      hemiptera_odb12.
 #
 # Input:  Trinity.fasta from 01_trinity_assembly.sh
 # Output: assembly_stats.txt  — TrinityStats.pl output
@@ -44,10 +44,12 @@ echo "============================================================"
 # MODULES / CONTAINERS
 # =============================================================================
 
-module load bioinfo-wave apptainer busco
+module load bioinfo-wave apptainer
 
 # Trinity container — provides TrinityStats.pl
 SIF="/projects/onilee/software/containers/trinity_2.15.2.sif"
+# BUSCO container
+BUSCO_SIF="/projects/onilee/software/containers/busco_6.00.sif"
 APPTAINER_BINDS="/scratch,/projects"
 
 
@@ -64,13 +66,13 @@ LOG_DIR="${TRINITY_DIR}/99_logs"
 FASTA="${ASSEMBLY_DIR}/Trinity.fasta"
 
 # BUSCO settings
-BUSCO_LINEAGE="insecta_odb10"    # swap to hemiptera_odb10 for a finer-grained check
-BUSCO_OUT_NAME="busco_${BUSCO_LINEAGE%_odb10}"   # → busco_insecta
+BUSCO_LINEAGE="insecta_odb12"    # swap to hemiptera_odb12 for a finer-grained check
+BUSCO_OUT_NAME="busco_${BUSCO_LINEAGE%%_odb*}"   # → busco_insecta
 BUSCO_OUT_DIR="${STATS_DIR}/${BUSCO_OUT_NAME}"
 # /projects is read-only on compute nodes — BUSCO's download manager will crash
 # if --download_path points there even with --offline.  Solution: use a writable
 # scratch directory and symlink the lineage in so BUSCO can read it.
-BUSCO_LINEAGE_SRC="/projects/onilee/databases/lineages/${BUSCO_LINEAGE}"
+BUSCO_LINEAGE_SRC="/projects/onilee/databases/lineages/${BUSCO_LINEAGE}"   # read-only on compute node
 BUSCO_DOWNLOAD_PATH="/scratch/onilee/busco_downloads"
 BUSCO_LINEAGE_PATH="${BUSCO_DOWNLOAD_PATH}/lineages/${BUSCO_LINEAGE}"
 
@@ -171,59 +173,47 @@ echo "Section 3: BUSCO (${BUSCO_LINEAGE})"
 echo "=========================================="
 echo ""
 
-# BUSCO writes to the current directory by default; cd to STATS_DIR so all
-# output lands in one place.  The --out_path flag (BUSCO ≥5) makes this explicit.
+echo "  BUSCO version: $(apptainer exec --bind "${APPTAINER_BINDS}" "${BUSCO_SIF}" busco --version 2>&1 | head -1)"
 
-if command -v busco &>/dev/null; then
-    echo "  BUSCO version: $(busco --version 2>&1 | head -1)"
-else
-    echo "  WARNING: busco not found in PATH. Check module load above."
-    echo "  Skipping BUSCO section."
-    # Don't exit — TrinityStats output is already saved above
+# Remove a previous partial BUSCO run for this lineage to avoid confusion
+if [ -d "${BUSCO_OUT_DIR}" ]; then
+    echo "  Removing previous BUSCO output directory: ${BUSCO_OUT_DIR}"
+    rm -rf "${BUSCO_OUT_DIR}"
 fi
 
-if command -v busco &>/dev/null; then
-    # Remove a previous partial BUSCO run for this lineage to avoid confusion
-    if [ -d "${BUSCO_OUT_DIR}" ]; then
-        echo "  Removing previous BUSCO output directory: ${BUSCO_OUT_DIR}"
-        rm -rf "${BUSCO_OUT_DIR}"
-    fi
+echo ""
+echo "  Running BUSCO..."
+echo "  Lineage:    ${BUSCO_LINEAGE}"
+echo "  Mode:       transcriptome"
+echo "  Output dir: ${BUSCO_OUT_DIR}"
+echo "  CPUs:       ${THREADS}"
+echo ""
 
+apptainer exec --bind "${APPTAINER_BINDS}" "${BUSCO_SIF}" busco \
+    --in              "${FASTA}" \
+    --out             "${BUSCO_OUT_NAME}" \
+    --out_path        "${STATS_DIR}" \
+    --mode            transcriptome \
+    --lineage_dataset "${BUSCO_LINEAGE}" \
+    --download_path   "${BUSCO_DOWNLOAD_PATH}" \
+    --offline \
+    --cpu             "${THREADS}" \
+    --force
+
+echo ""
+echo "BUSCO finished: $(date)"
+
+# Print the short summary
+SUMMARY=$(find "${BUSCO_OUT_DIR}" -name "short_summary*.txt" | head -1)
+if [ -n "${SUMMARY}" ]; then
     echo ""
-    echo "  Running BUSCO..."
-    echo "  Lineage:    ${BUSCO_LINEAGE}"
-    echo "  Mode:       transcriptome"
-    echo "  Output dir: ${BUSCO_OUT_DIR}"
-    echo "  CPUs:       ${THREADS}"
+    echo "--- BUSCO short summary ---"
+    cat "${SUMMARY}"
+    cp "${SUMMARY}" "${LOG_DIR}/busco_short_summary_${SLURM_JOB_ID}.txt"
     echo ""
-
-    busco \
-        --in              "${FASTA}" \
-        --out             "${BUSCO_OUT_NAME}" \
-        --out_path        "${STATS_DIR}" \
-        --mode            transcriptome \
-        --lineage_dataset "${BUSCO_LINEAGE}" \
-        --download_path   "${BUSCO_DOWNLOAD_PATH}" \
-        --offline \
-        --cpu             "${THREADS}" \
-        --force
-
-    echo ""
-    echo "BUSCO finished: $(date)"
-
-    # Print the short summary
-    SUMMARY=$(find "${BUSCO_OUT_DIR}" -name "short_summary*.txt" | head -1)
-    if [ -n "${SUMMARY}" ]; then
-        echo ""
-        echo "--- BUSCO short summary ---"
-        cat "${SUMMARY}"
-        # Copy to logs for easy reference
-        cp "${SUMMARY}" "${LOG_DIR}/busco_short_summary_${SLURM_JOB_ID}.txt"
-        echo ""
-        echo "Summary copied to: ${LOG_DIR}/busco_short_summary_${SLURM_JOB_ID}.txt"
-    else
-        echo "WARNING: short_summary file not found in ${BUSCO_OUT_DIR}"
-    fi
+    echo "Summary copied to: ${LOG_DIR}/busco_short_summary_${SLURM_JOB_ID}.txt"
+else
+    echo "WARNING: short_summary file not found in ${BUSCO_OUT_DIR}"
 fi
 
 # =============================================================================
