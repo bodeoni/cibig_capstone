@@ -67,7 +67,11 @@ FASTA="${ASSEMBLY_DIR}/Trinity.fasta"
 BUSCO_LINEAGE="insecta_odb10"    # swap to hemiptera_odb10 for a finer-grained check
 BUSCO_OUT_NAME="busco_${BUSCO_LINEAGE%_odb10}"   # → busco_insecta
 BUSCO_OUT_DIR="${STATS_DIR}/${BUSCO_OUT_NAME}"
-BUSCO_LINEAGE_PATH="/projects/onilee/databases/lineages/${BUSCO_LINEAGE}"
+# BUSCO expects --download_path to be the parent of lineages/, i.e. the directory
+# that contains a lineages/ subdirectory.  It then finds the lineage at:
+#   ${BUSCO_DOWNLOAD_PATH}/lineages/${BUSCO_LINEAGE}
+BUSCO_DOWNLOAD_PATH="/projects/onilee/databases"
+BUSCO_LINEAGE_PATH="${BUSCO_DOWNLOAD_PATH}/lineages/${BUSCO_LINEAGE}"
 
 THREADS=12
 
@@ -187,7 +191,8 @@ if command -v busco &>/dev/null; then
         --out             "${BUSCO_OUT_NAME}" \
         --out_path        "${STATS_DIR}" \
         --mode            transcriptome \
-        --lineage_dataset "${BUSCO_LINEAGE_PATH}" \
+        --lineage_dataset "${BUSCO_LINEAGE}" \
+        --download_path   "${BUSCO_DOWNLOAD_PATH}" \
         --offline \
         --cpu             "${THREADS}" \
         --force
